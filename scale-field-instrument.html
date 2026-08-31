@@ -12,8 +12,6 @@
     --stone:#C7C6C1;      /* Stonington Gray */
     --ink:#686763;        /* Kendall Charcoal */
     --deep:#30302D;
-    --hair:rgba(104,103,99,.25);
-    --ghost:rgba(104,103,99,.12);
   }
   *{box-sizing:border-box}
   html,body{height:100%;margin:0;background:var(--paper);color:var(--ink);font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;font-weight:300;-webkit-font-smoothing:antialiased;overflow:hidden}
@@ -145,8 +143,6 @@
       o1.connect(g);o2.connect(g);g.connect(pan).connect(master);o1.start(now);o2.start(now);o1.stop(now+attack+dur+release+.08);o2.stop(now+attack+dur+release+.08);
     }
   }
-  function vlq(n){let b=n&0x7F,out=[];while((n>>=7)){b<<=8;b|=(n&0x7F)|0x80}while(true){out.push(b&255);if(b&0x80)b>>=8;else break}return out}
-  function buildMIDI(events,tpq,us){const tr=[],ev=(d,a)=>tr.push(...vlq(d),...a);ev(0,[0xff,0x58,4,4,2,24,8]);ev(0,[0xff,0x51,3,(us>>16)&255,(us>>8)&255,us&255]);const flat=[];events.forEach(e=>{const on=Math.max(0,Math.round(e.t*tpq)),off=Math.max(on+1,Math.round((e.t+e.dur)*tpq));flat.push({tick:on,kind:0,bytes:[0x90,e.midi&127,e.vel&127]});flat.push({tick:off,kind:1,bytes:[0x80,e.midi&127,0]})});flat.sort((a,b)=>a.tick===b.tick?a.kind-b.kind:a.tick-b.tick);let tick=0;flat.forEach(f=>{const dt=Math.max(0,f.tick-tick);ev(dt,f.bytes);tick=f.tick});ev(0,[0xff,0x2f,0]);const len=tr.length;return new Uint8Array([0x4d,0x54,0x68,0x64,0,0,0,6,0,0,0,1,(tpq>>8)&255,tpq&255,0x4d,0x54,0x72,0x6b,(len>>>24)&255,(len>>>16)&255,(len>>>8)&255,len&255,...tr])}
   function randomizeArp(){seqOrder=notes.map((_,i)=>i);for(let i=seqOrder.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[seqOrder[i],seqOrder[j]]=[seqOrder[j],seqOrder[i]]}seqXs=seqOrder.map((_,i)=>clamp((i/(notes.length-1))*0.84+0.08+(Math.random()-.5)*0.18,0.02,0.98));if(Math.random()<.5)seqXs.reverse();seqIndex=0}
   function startSeq(){boot();if(AC.state==='suspended')AC.resume();randomizeArp();isSeq=true;tickSeq()}
   function stopSeq(){isSeq=false;clearTimeout(seqTimer);seqTimer=null}

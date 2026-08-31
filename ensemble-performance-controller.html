@@ -3,7 +3,6 @@
 <title>Ensemble Performance Controller</title>
 <link rel="stylesheet" href="./assets/theme.css" />
 <style>
-:root{ --cream: var(--paper); --blue: var(--accent-a); --pink: var(--accent-b); --grey: var(--stone); --ink: var(--ink-strong); }
 .wrap{max-width:1100px;margin:0 auto;padding:22px;display:grid;grid-template-columns:minmax(280px,340px) 1fr;gap:16px}
 @media(max-width:900px){.wrap{grid-template-columns:1fr}}
 .top{grid-column:1/-1}
@@ -58,7 +57,7 @@ function fire(c){ if(c==='go'){ apply(p=>p.mute=false); players.forEach((p,i)=> 
  if(c==='t+12'){ apply(p=>{ p.tr+=12; p.regen(); }); }
  if(c==='guard'){ state.guard=!state.guard; apply(p=>p.regen()); } }
 function init(){ build(); document.getElementById('bpm').onchange=e=> state.bpm=parseInt(e.target.value,10); document.getElementById('bars').onchange=e=>{ state.bars=parseInt(e.target.value,10); players.forEach(p=>p.regen()); };
- document.getElementById('start').onclick=()=>{ ensureAudio(); const c=audio.ctx; if(c.state==='suspended') c.resume(); state.running=true; state.nextBeat=c.currentTime; state.lookahead=spb()/4; document.getElementById('clk').textContent='Clock: running'; schedule(); };
+ document.getElementById('start').onclick=()=>{ if(state.running) return; ensureAudio(); const c=audio.ctx; if(c.state==='suspended') c.resume(); state.running=true; state.nextBeat=c.currentTime; state.lookahead=spb()/4; document.getElementById('clk').textContent='Clock: running'; schedule(); };
  document.getElementById('stop').onclick=()=>{ state.running=false; document.getElementById('clk').textContent='Clock: stopped'; };
  document.getElementById('flip').onclick=()=>{ players.forEach(p=> p.group=(p.group==='A'?'B':'A')); };
  document.querySelectorAll('[data-c]').forEach(b=> b.onclick=()=> fire(b.dataset.c));

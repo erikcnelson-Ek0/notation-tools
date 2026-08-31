@@ -13,7 +13,7 @@ Open `index.html` for the full list, or jump straight to a tool:
   density, spread, and inversion follow the gesture. Store snapshots, sequence them, export MIDI
   or a PNG score.
 - **[Sound Analyzer](./sound-analyzer.html)** — mel spectrogram, chroma, and onset detection on a
-  loaded audio file, live, exporting to JSON, CSV, or MIDI.
+  loaded audio file, live, exporting to JSON, CSV, or MIDI, plus a PNG snapshot of the current view.
 - **[Ensemble Performance Controller](./ensemble-performance-controller.html)** — four independent
   players on one shared clock, with cueable groups, transpose, scale-guard, and five generative
   pattern engines.

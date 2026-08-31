@@ -221,9 +221,7 @@
   // Render loop
   function kick(){ if(rafId) cancelAnimationFrame(rafId); loop(); }
   function loop(){
-    drawSpec();
-    drawTime();
-    drawAux();
+    if(!paused){ drawSpec(); drawTime(); drawAux(); }
     rafId = requestAnimationFrame(loop);
   }
 
@@ -354,7 +352,7 @@
 
   // Capture / analysis
   function startCapture(){ lastCapture=0; melFrames=[]; chromaFrames=[]; onsetTimes=[]; onsetStrengths=[]; fluxSeries=[]; energySeries=[]; lastMag=null; }
-  function stopCapture(){ /* nothing — live capture stops when you stop playback */ }
+  function stopCapture(){ if(rafId){ cancelAnimationFrame(rafId); rafId=null; } stopSource(); startTime=null; }
 
   function spectralFlux(cur, prev){
     if(!prev) return null;

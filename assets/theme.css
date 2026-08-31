@@ -21,7 +21,6 @@
   --ink:        #68675F;
   --ink-strong: #2E2E2A;
   --hair:       rgba(46,46,42,.16);
-  --ghost:      rgba(46,46,42,.06);
 
   /* one soft accent pair, used only for the convergence bar,
      focus states, and small emphasis — never for large fills */

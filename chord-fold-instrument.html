@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="./assets/theme.css">
 <title>Chord Fold Instrument</title>
 <style>
-:root{--lace:#F4F1EA;--stone:#C7C6C1;--edge:#777671;--charcoal:#68675F;--deep:#2E2E2A;--hair:rgba(104,103,99,.26);--ghost:rgba(104,103,99,.12)}
+:root{--lace:#F4F1EA;--stone:#C7C6C1;--edge:#777671;--charcoal:#68675F;--deep:#2E2E2A;--hair:rgba(104,103,99,.26)}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;overflow:hidden;background:var(--lace);color:var(--charcoal);font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;font-weight:300;-webkit-font-smoothing:antialiased;text-rendering:geometricPrecision}
 body{display:grid;place-items:center}
@@ -74,7 +74,7 @@ canvas{width:100%;height:100%;display:block;background:var(--lace);cursor:crossh
   const exportPngBtn = document.getElementById('exportPng');
   const fullBtn = document.getElementById('full');
 
-  const LACE = '#F4F1EA', STONE = '#C7C6C1', INK = '#686763', DEEP = '#3A3A37';
+  const LACE = '#F4F1EA', DEEP = '#2E2E2A';
   const keyMap = {"C":0,"C#":1,"D":2,"Eb":3,"E":4,"F":5,"F#":6,"G":7,"Ab":8,"A":9,"Bb":10,"B":11};
   const minor = [0,2,3,5,7,8,10];
   const names = ['C','C#','D','Eb','E','F','F#','G','Ab','A','Bb','B'];
