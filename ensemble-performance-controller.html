@@ -1,0 +1,68 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"/>
+<link rel="icon" href="data:,"><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Ensemble Performance Controller</title>
+<link rel="stylesheet" href="./assets/theme.css" />
+<style>
+:root{ --cream: var(--paper); --blue: var(--accent-a); --pink: var(--accent-b); --grey: var(--stone); --ink: var(--ink-strong); }
+.wrap{max-width:1100px;margin:0 auto;padding:22px;display:grid;grid-template-columns:minmax(280px,340px) 1fr;gap:16px}
+@media(max-width:900px){.wrap{grid-template-columns:1fr}}
+.top{grid-column:1/-1}
+label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px;color:var(--ink)}
+input,select,button{width:100%;padding:9px 11px;border:1px solid var(--stone);border-radius:var(--radius-sm);background:var(--paper-lift);color:var(--ink-strong);font-size:13px}
+button{cursor:pointer;border-color:var(--ink-strong);text-transform:uppercase;letter-spacing:.05em;font-size:11px} button.primary{background:var(--ink-strong);color:var(--paper)} button:hover{opacity:.85}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px} .cuebar{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.cue{padding:9px 11px;border:1px solid var(--ink-strong);border-radius:var(--radius-sm);background:var(--paper-lift);text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.05em;cursor:pointer}
+.cue:hover{background:var(--ink-strong);color:var(--paper)}
+.players{display:grid;gap:14px} .player{display:grid;gap:8px} .player header{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.mini{display:grid;grid-template-columns:1fr auto;gap:10px}
+canvas{display:block;width:100%;height:90px;border:1px solid var(--stone);border-radius:var(--radius-sm);background:linear-gradient(180deg,var(--paper-lift),var(--paper))}
+</style></head><body>
+<div class="wrap">
+<div class="top"><h1 class="title" style="font-size:16px">Ensemble Performance Controller</h1><div class="sub">Four independent players on one shared clock — cueable groups, transpose, scale-guard, generative patterns</div><div class="converge-bar"></div></div>
+<section class="panel" id="con">
+<div class="row"><div><label>BPM</label><input id="bpm" type="number" value="120" min="40" max="220"/></div><div><label>Bars</label><input id="bars" type="number" value="4" min="1" max="16"/></div></div>
+<div class="row" style="margin-top:10px"><button id="start" class="primary">Start Clock</button><button id="stop">Stop</button></div>
+<div class="row" style="margin-top:10px"><div><label>Target</label><select id="tSel"><option value="all">All</option><option value="A">Group A</option><option value="B">Group B</option><option value="solo">Solo</option></select></div>
+<div><label>Solo Player</label><select id="solo"><option value="0">P1</option><option value="1">P2</option><option value="2">P3</option><option value="3">P4</option></select></div></div>
+<div class="cuebar" style="margin-top:10px"><button class="cue" data-c="go">GO</button><button class="cue" data-c="cut">CUT</button><button class="cue" data-c="seed">DICE</button><button class="cue" data-c="pat">Pattern</button></div>
+<div class="cuebar" style="margin-top:10px"><button class="cue" data-c="t-12">–12</button><button class="cue" data-c="t-7">–7</button><button class="cue" data-c="t+7">+7</button><button class="cue" data-c="t+12">+12</button></div>
+<div class="row" style="margin-top:10px"><button class="cue" data-c="guard">Scale-Guard</button><button class="cue" id="flip">Flip A↔B</button></div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><span class="badge" id="clk">Clock: stopped</span><span class="badge" id="tLbl">Target: All</span></div>
+<div class="log" id="log" style="margin-top:10px"></div>
+<div style="margin-top:10px"><a class="textBtn" href="./index.html">Collection</a></div>
+</section><section class="players" id="players"></section></div>
+<script>
+const NOTE_INDEX={"C":0,"C#":1,"Db":1,"D":2,"D#":3,"Eb":3,"E":4,"F":5,"F#":6,"Gb":6,"G":7,"G#":8,"Ab":8,"A":9,"A#":10,"Bb":10,"B":11};
+const SCALES={major:[0,2,4,5,7,9,11],minor:[0,2,3,5,7,8,10],dorian:[0,2,3,5,7,9,10],mixolydian:[0,2,4,5,7,9,10],minorpent:[0,3,5,7,10],chromatic:[0,1,2,3,4,5,6,7,8,9,10,11]};
+function scaleDegrees(root,kind,oct){const idx=NOTE_INDEX[root],base=(oct+1)*12+idx,iv=SCALES[kind]||SCALES.minor,d=[];for(let o=-2;o<=4;o++){for(const k of iv)d.push(base+k+12*o);}return d.sort((a,b)=>a-b);} function nearest(m,deg){let b=deg[0],bd=Math.abs(m-deg[0]);for(let i=1;i<deg.length;i++){const dd=Math.abs(m-deg[i]);if(dd<bd){bd=dd;b=deg[i];}}return b;} function degreeAt(a,i){const j=((i%a.length)+a.length)%a.length;return a[j];}
+function mulberry32(a){return function(){let t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;}} const audio={ctx:null,master:null}; function ensureAudio(){if(audio.ctx)return;const c=new (window.AudioContext||window.webkitAudioContext)();const g=c.createGain();g.gain.value=0.6;g.connect(c.destination);audio.ctx=c;audio.master=g;}
+function beep(t,m,d,v){const c=audio.ctx;if(!c)return;const o=c.createOscillator(),g=c.createGain();const f=440*Math.pow(2,(m-69)/12);o.type='triangle';o.frequency.setValueAtTime(f,t);const vv=(Math.max(1,Math.min(127,v))/127)*0.15;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vv,t+0.005);g.gain.exponentialRampToValueAtTime(0.0001,t+Math.max(0.05,d)*0.9);o.connect(g);g.connect(audio.master);o.start(t);o.stop(t+Math.max(0.06,d));}
+const PATTERNS=["arp","pulse","drone","clock","canon"]; function genArp({degrees,bars,vel,rng}){const base=[0,2,4,6,7,4,2,0],rot=Math.floor(rng()*base.length),seq=[],steps=bars*8;let t=0;for(let i=0;i<steps;i++){const di=base[(i+rot)%base.length];seq.push({t,midi:degreeAt(degrees,20+di),dur:0.5,vel});t+=0.5;}return seq;} function genPulse({degrees,bars,vel,rng}){const total=bars*4,seq=[];let t=0;const pick=(i)=>degreeAt(degrees,i);while(t<total){seq.push({t,midi:pick(0),dur:1.0,vel});t+=1.0;if(rng()<0.35){seq.push({t,midi:pick(-12),dur:0.5,vel:Math.max(1,vel-40)});}t+=0.5;seq.push({t,midi:rng()<0.5?pick(2):pick(4),dur:0.5,vel:vel-6});t+=1.0;}return seq;}
+function genDrone({degrees,bars,vel,rng}){const total=bars*4,picks=[0,4,7,9,11],seq=[];let t=0;for(const k of picks){let m=degreeAt(degrees,20+k);if(rng()<0.25)m-=12;seq.push({t,midi:m,dur:Math.max(2,total-t),vel:vel-6});t+=0.5;}return seq;} function genClock({degrees,bars,vel,rng}){const total=bars*4,seq=[];const md=0.75;for(let s=0;s<=total;s+=3){for(const di of [0,2,4]){const t=s+di*md/2;if(t<total)seq.push({t,midi:degreeAt(degrees,16+di),dur:md,vel});}}return seq;} function genCanon({degrees,bars,vel,rng}){const total=bars*4,seq=[],motif=[0,1,2,4,3,1];let ta=0,tb=4.0;const d=1.0;while(ta<total||tb<total){for(const di of motif){if(ta<total){seq.push({t:ta,midi:degreeAt(degrees,18+di),dur:d,vel:vel-4});ta+=d;}}for(const di of motif){if(tb<total){seq.push({t:tb,midi:degreeAt(degrees,18+di),dur:d,vel:vel-10});tb+=d;}}}return seq;}
+function makeLoop(p,x){return({arp:genArp,pulse:genPulse,drone:genDrone,clock:genClock,canon:genCanon}[p]||genArp)(x);} function guardSeq(seq,deg,tr,guard){return seq.map(e=>{let m=e.midi+tr; if(guard)m=nearest(m,deg); return {...e,midi:m};});}
+function fit(cv){const r=window.devicePixelRatio||1,w=cv.clientWidth*r,h=cv.clientHeight*r;if(cv.width!==w||cv.height!==h){cv.width=w;cv.height=h;}} function draw(cv,seq,bars){if(!cv)return;fit(cv);const ctx=cv.getContext('2d');const W=cv.width,H=cv.height;ctx.clearRect(0,0,W,H);const tot=Math.max(1,bars*4);for(let b=0;b<=tot;b++){const x=(b/tot)*W;ctx.strokeStyle=b%4===0?'#AEC0BC':'#C7C6C1';ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}const p=seq.length?{min:Math.min(...seq.map(e=>e.midi)),max:Math.max(...seq.map(e=>e.midi))}:{min:60,max:72};const R=Math.max(1,(p.max-p.min+1));for(const e of seq){const x=(e.t/tot)*W,w=(e.dur/tot)*W,y=H-((e.midi-p.min+1)/R)*H,h=Math.max(4,H/R-2);ctx.fillStyle='#2E2E2A';ctx.globalAlpha=0.85;ctx.fillRect(x+0.5,y+0.5,Math.max(2,w-1),h);ctx.globalAlpha=1;}}
+function Player(i,g){this.id=i;this.group=g;this.name=`Player ${i+1}`;this.root='E';this.scale='minor';this.oct=4;this.vel=96;this.pat=['arp','pulse','drone','clock','canon'][i%5];this.tr=0;this.mute=false;this.seed=Date.now()^i;this.rng=mulberry32(this.seed);this.deg=scaleDegrees(this.root,this.scale,this.oct);this.seq=guardSeq(makeLoop(this.pat,{degrees:this.deg,bars:4,vel:this.vel,rng:this.rng}),this.deg,this.tr,true);this.cv=null;}
+Player.prototype.regen=function(){this.deg=scaleDegrees(this.root,this.scale,this.oct);this.rng=mulberry32(this.seed);this.seq=guardSeq(makeLoop(this.pat,{degrees:this.deg,bars:state.bars,vel:this.vel,rng:this.rng}),this.deg,this.tr,state.guard);draw(this.cv,this.seq,state.bars);}; Player.prototype.cycle=function(){const i=['arp','pulse','drone','clock','canon'].indexOf(this.pat);this.pat=['arp','pulse','drone','clock','canon'][(i+1)%5];this.regen();};
+const players=[]; function card(p,i){const s=document.createElement('section'); s.className='panel player'; s.innerHTML=`<header><strong>${p.name}</strong><span class="badge" id="pm${i}">Live</span></header><div class="row"><div><label>Pattern</label><select id="pat${i}"><option value="arp">Arp</option><option value="pulse">Pulse</option><option value="drone">Drone</option><option value="clock">Clock</option><option value="canon">Canon</option></select></div><div><label>Transpose</label><div style="display:grid;grid-template-columns:1fr auto;gap:10px"><input id="tr${i}" type="number" value="${p.tr}" min="-36" max="36"/><button id="dice${i}">🎲</button></div></div></div><canvas id="cv${i}"></canvas><div class="row"><button id="mute${i}">Mute</button><button id="solo${i}">Solo</button></div>`; p.cv=s.querySelector('#cv'+i); s.querySelector('#pat'+i).value=p.pat; s.querySelector('#pat'+i).onchange=e=>{p.pat=e.target.value;p.regen();}; s.querySelector('#tr'+i).onchange=e=>{p.tr=parseInt(e.target.value,10);p.regen();}; s.querySelector('#dice'+i).onclick=()=>{p.seed=Date.now()^Math.floor(Math.random()*1e9);p.regen();}; s.querySelector('#mute'+i).onclick=()=>{p.mute=!p.mute; document.querySelector('#pm'+i).textContent=p.mute?'Muted':'Live';}; s.querySelector('#solo'+i).onclick=()=>{players.forEach((pp,j)=>{pp.mute=(j!==i); document.querySelector('#pm'+j).textContent=pp.mute?'Muted':'Live';});}; p.regen(); return s;}
+function build(){const wrap=document.getElementById('players'); wrap.innerHTML=''; players.length=0; for(let i=0;i<4;i++){ const p=new Player(i, i%2===0?'A':'B'); players.push(p); wrap.appendChild(card(p,i)); } requestAnimationFrame(()=> players.forEach(p=>draw(p.cv,p.seq,state.bars)));}
+const state={bpm:120,bars:4,running:false,nextBeat:0,lookahead:0.25/4,ahead:0.25,target:'all',guard:true}; function spb(){return 60/Math.max(30,state.bpm);}
+function schedule(){ if(!state.running) return; const c=audio.ctx, now=c.currentTime; while(state.nextBeat<now+state.ahead){ const beat=state.nextBeat, tot=state.bars*4; players.forEach(p=>{ if(p.mute)return; for(const e of p.seq){ const t=beat + ((e.t%tot)*spb()); if(t>=now && t<now+state.ahead) beep(t,e.midi,e.dur*spb(),e.vel); } }); state.nextBeat += state.lookahead; } setTimeout(schedule,25); }
+function apply(fn){ const tgt=state.target, solo=parseInt(document.getElementById('solo').value,10); players.forEach((p,i)=>{ if(tgt==='all'||(tgt==='A'&&p.group==='A')||(tgt==='B'&&p.group==='B')||(tgt==='solo'&&i===solo)) fn(p,i); }); }
+function fire(c){ if(c==='go'){ apply(p=>p.mute=false); players.forEach((p,i)=> document.querySelector('#pm'+i).textContent=p.mute?'Muted':'Live'); }
+ if(c==='cut'){ apply(p=>p.mute=true); players.forEach((p,i)=> document.querySelector('#pm'+i).textContent=p.mute?'Muted':'Live'); }
+ if(c==='seed'){ apply(p=>{ p.seed=Date.now()^Math.floor(Math.random()*1e9); p.regen(); }); }
+ if(c==='pat'){ apply(p=>p.cycle()); }
+ if(c==='t-12'){ apply(p=>{ p.tr-=12; p.regen(); }); }
+ if(c==='t-7'){ apply(p=>{ p.tr-=7; p.regen(); }); }
+ if(c==='t+7'){ apply(p=>{ p.tr+=7; p.regen(); }); }
+ if(c==='t+12'){ apply(p=>{ p.tr+=12; p.regen(); }); }
+ if(c==='guard'){ state.guard=!state.guard; apply(p=>p.regen()); } }
+function init(){ build(); document.getElementById('bpm').onchange=e=> state.bpm=parseInt(e.target.value,10); document.getElementById('bars').onchange=e=>{ state.bars=parseInt(e.target.value,10); players.forEach(p=>p.regen()); };
+ document.getElementById('start').onclick=()=>{ ensureAudio(); const c=audio.ctx; if(c.state==='suspended') c.resume(); state.running=true; state.nextBeat=c.currentTime; state.lookahead=spb()/4; document.getElementById('clk').textContent='Clock: running'; schedule(); };
+ document.getElementById('stop').onclick=()=>{ state.running=false; document.getElementById('clk').textContent='Clock: stopped'; };
+ document.getElementById('flip').onclick=()=>{ players.forEach(p=> p.group=(p.group==='A'?'B':'A')); };
+ document.querySelectorAll('[data-c]').forEach(b=> b.onclick=()=> fire(b.dataset.c));
+ document.getElementById('tSel').onchange=e=>{ state.target=e.target.value; document.getElementById('tLbl').textContent='Target: '+state.target.toUpperCase(); };
+ window.addEventListener('keydown',e=>{ if(e.code==='Space'){ e.preventDefault(); if(state.running) document.getElementById('stop').click(); else document.getElementById('start').click(); }}); }
+window.addEventListener('load',init);
+</script></body></html>

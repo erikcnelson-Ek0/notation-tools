@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="icon" href="data:,">
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Notation Instruments</title>
+<link rel="stylesheet" href="./assets/theme.css" />
+<style>
+  .card{ display:flex; flex-direction:column; gap:10px; }
+  .card .actions{ margin-top:auto; display:flex; gap:10px; flex-wrap:wrap; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1 class="title" style="font-size:22px;letter-spacing:.04em;text-transform:none">Notation Instruments</h1>
+    <p class="lede">A small set of browser-based, single-file audio and notation tools — playable
+      surfaces, generative scores, and analysis utilities. Each one opens as a standalone page;
+      nothing to install.</p>
+    <div class="converge-bar"></div>
+
+    <div class="grid">
+      <section class="card panel">
+        <h3 style="margin:0;font-weight:400">XY Pad Instrument</h3>
+        <p class="sub" style="margin:0">X sweeps register, Y selects a note lane. Space bar triggers a
+          randomized arpeggiation. Records a session and exports standard MIDI.</p>
+        <div class="actions"><a class="btn primary" href="./xy-pad-instrument.html">Open</a></div>
+      </section>
+
+      <section class="card panel">
+        <h3 style="margin:0;font-weight:400">Scale Field Instrument</h3>
+        <p class="sub" style="margin:0">A generative visual score played by drawing across it —
+          waveform, scale, and tempo are all live and rendered as a shifting field.</p>
+        <div class="actions"><a class="btn primary" href="./scale-field-instrument.html">Open</a></div>
+      </section>
+
+      <section class="card panel">
+        <h3 style="margin:0;font-weight:400">Dual Surface Instrument</h3>
+        <p class="sub" style="margin:0">Two playable surfaces sharing one master key, for two-handed
+          or two-player performance, tempo-calibrated.</p>
+        <div class="actions"><a class="btn primary" href="./dual-surface-instrument.html">Open</a></div>
+      </section>
+
+      <section class="card panel">
+        <h3 style="margin:0;font-weight:400">Chord Fold Instrument</h3>
+        <p class="sub" style="margin:0">Drag to fold a plane into a chord — density, spread, and
+          inversion follow the gesture. Store snapshots, sequence them, export MIDI or a PNG score.</p>
+        <div class="actions"><a class="btn primary" href="./chord-fold-instrument.html">Open</a></div>
+      </section>
+
+      <section class="card panel">
+        <h3 style="margin:0;font-weight:400">Score Extractor</h3>
+        <p class="sub" style="margin:0">Audio in. A beat-aware score you can correct — adjust the
+          grid, sensitivity, and density, then export a cleaned-up MIDI file.</p>
+        <div class="actions"><a class="btn primary" href="./score-extractor.html">Open</a></div>
+      </section>
+
+      <section class="card panel">
+        <h3 style="margin:0;font-weight:400">Sound Analyzer</h3>
+        <p class="sub" style="margin:0">Mel spectrogram, chroma, and onset detection on a loaded audio
+          file, live — export to JSON, CSV, or MIDI, plus a poster snapshot.</p>
+        <div class="actions"><a class="btn primary" href="./sound-analyzer.html">Open</a></div>
+      </section>
+
+      <section class="card panel">
+        <h3 style="margin:0;font-weight:400">Ensemble Performance Controller</h3>
+        <p class="sub" style="margin:0">Four independent players on one shared clock — cueable groups,
+          transpose, scale-guard, and five generative pattern engines.</p>
+        <div class="actions"><a class="btn primary" href="./ensemble-performance-controller.html">Open</a></div>
+      </section>
+
+      <section class="card panel">
+        <h3 style="margin:0;font-weight:400">Note Generator</h3>
+        <p class="sub" style="margin:0">Five pattern engines turn a key, scale, and tempo into a note
+          sequence — piano-roll preview, export to CSV or MIDI.</p>
+        <div class="actions"><a class="btn primary" href="./note-generator.html">Open</a></div>
+      </section>
+    </div>
+
+    <hr class="hair" />
+    <footer class="meta">Static HTML/CSS/JS · Web Audio + Canvas · no build step, no dependencies.
+      Some tools use the microphone or a loaded audio file — serve locally
+      (<code>python -m http.server</code>) rather than opening via <code>file://</code> if a browser
+      blocks that.</footer>
+  </div>
+</body>
+</html>

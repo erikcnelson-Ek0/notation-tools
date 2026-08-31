@@ -1,0 +1,209 @@
+/*
+  Shared visual system for this collection.
+  One quiet, editorial language across every tool: warm paper ground,
+  hairline rule work, uppercase micro-type, and a single soft two-tone
+  accent used sparingly to mark where one field gives way to another.
+
+  Import with: <link rel="stylesheet" href="./assets/theme.css">
+  Every page may still carry a small <style> block of its own for
+  layout that is specific to that one tool — this file only defines
+  tokens and the handful of components repeated across tools.
+*/
+
+:root{
+  /* ground */
+  --paper:      #F4F1EA;
+  --paper-deep: #EAE5DA;
+  --paper-lift: #FFFDF8;
+
+  /* line + ink */
+  --stone:      #C7C6C1;
+  --ink:        #68675F;
+  --ink-strong: #2E2E2A;
+  --hair:       rgba(46,46,42,.16);
+  --ghost:      rgba(46,46,42,.06);
+
+  /* one soft accent pair, used only for the convergence bar,
+     focus states, and small emphasis — never for large fills */
+  --accent-a:   #AEC0BC;
+  --accent-b:   #D8C3AE;
+
+  --radius:     14px;
+  --radius-sm:  10px;
+  --font:       "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --mono:       ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+*, *:before, *:after{ box-sizing: border-box; }
+
+html, body{
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font);
+  font-weight: 300;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+}
+
+body{ line-height: 1.5; }
+
+a{ color: var(--ink-strong); }
+
+/* ---------- type ---------- */
+
+.eyebrow, .title, h1.title{
+  margin: 0;
+  font-weight: 300;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--ink-strong);
+}
+
+h1.title{ font-size: 14px; }
+
+.sub{
+  margin-top: 6px;
+  font-size: 11px;
+  letter-spacing: .08em;
+  line-height: 1.65;
+  opacity: .72;
+}
+
+.lede{
+  font-size: 15px;
+  font-weight: 300;
+  line-height: 1.6;
+  color: var(--ink-strong);
+  opacity: .85;
+}
+
+/* ---------- the convergence bar ----------
+   a thin two-tone gradient rule — the one recurring mark of the set */
+
+.converge-bar{
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent-a), var(--accent-b));
+  margin: 10px 0 18px;
+}
+
+/* ---------- buttons + controls ---------- */
+
+button, select, input{
+  font-family: var(--font);
+  font-weight: 300;
+  color: var(--ink-strong);
+}
+
+.textBtn, .iconBtn{
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 4px 0;
+  font-size: 11px;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  cursor: pointer;
+  color: var(--ink);
+}
+.textBtn:hover, .iconBtn:hover,
+.textBtn.active, .iconBtn.active{
+  color: var(--ink-strong);
+  text-decoration: underline;
+  text-underline-offset: 5px;
+}
+
+.btn{
+  display: inline-block;
+  text-decoration: none;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--ink-strong);
+  color: var(--ink-strong);
+  background: var(--paper-lift);
+  font-size: 12px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.btn.primary{ background: var(--ink-strong); color: var(--paper); }
+.btn:hover{ opacity: .85; }
+
+.control{ display: grid; gap: 6px; min-width: 92px; }
+.control label{
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: .15em;
+  opacity: .68;
+}
+.control select, .control input[type=number]{
+  border: 0;
+  border-bottom: .5px solid var(--stone);
+  background: transparent;
+  border-radius: 0;
+  padding: 4px 0;
+  font-size: 12px;
+  outline: none;
+}
+
+.range{
+  -webkit-appearance: none; appearance: none;
+  width: 108px; height: 14px;
+  background: transparent; cursor: pointer; vertical-align: middle;
+}
+.range::-webkit-slider-runnable-track{ height: 2px; background: var(--stone); border-radius: 999px; }
+.range::-webkit-slider-thumb{
+  -webkit-appearance: none; appearance: none;
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--ink-strong); margin-top: -5px;
+}
+.range::-moz-range-track{ height: 2px; background: var(--stone); border-radius: 999px; }
+.range::-moz-range-thumb{ width: 12px; height: 12px; border: 0; border-radius: 50%; background: var(--ink-strong); }
+
+/* ---------- surfaces ---------- */
+
+.panel, .card{
+  background: var(--paper-lift);
+  border: 1px solid var(--stone);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.badge, .pill{
+  display: inline-block;
+  border: 1px solid var(--ink-strong);
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  letter-spacing: .04em;
+}
+
+.log{
+  max-height: 160px;
+  overflow: auto;
+  border: 1px solid var(--stone);
+  border-radius: var(--radius-sm);
+  padding: 8px;
+  background: var(--paper-lift);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+/* ---------- landing grid ---------- */
+
+.wrap{ max-width: 1080px; margin: 0 auto; padding: 22px; }
+.grid{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+footer.meta{
+  margin-top: 14px;
+  color: var(--ink);
+  font-size: 12px;
+  opacity: .8;
+}
+
+.hair{ border: 0; border-top: 1px solid var(--hair); margin: 18px 0; }

@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="./assets/theme.css">
+<title>Chord Fold Instrument</title>
+<style>
+:root{--lace:#F4F1EA;--stone:#C7C6C1;--edge:#777671;--charcoal:#68675F;--deep:#2E2E2A;--hair:rgba(104,103,99,.26);--ghost:rgba(104,103,99,.12)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--lace);color:var(--charcoal);font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;font-weight:300;-webkit-font-smoothing:antialiased;text-rendering:geometricPrecision}
+body{display:grid;place-items:center}
+.shell{width:min(96vw,1520px);height:min(90vh,940px);min-height:660px;border:.5px solid var(--edge);background:var(--lace);display:grid;grid-template-rows:auto minmax(0,1fr) auto;position:relative}
+.shell:before{content:"";position:absolute;left:-.5px;top:-22px;width:132px;height:22px;border:.5px solid var(--edge);border-bottom:0;background:var(--lace)}
+.shell:fullscreen{width:100vw;height:100dvh;min-height:0;border:0}.shell:-webkit-full-screen{width:100vw;height:100vh;min-height:0;border:0}.shell:fullscreen:before,.shell:-webkit-full-screen:before{display:none}
+.topbar{border-bottom:.5px solid var(--hair);display:grid;grid-template-columns:1fr auto;gap:18px;align-items:end;padding:10px clamp(18px,3vw,42px) 8px;font-size:11px;line-height:1.2;letter-spacing:.13em;text-transform:uppercase}
+.brand{margin:0;font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-weight:300;color:var(--charcoal)}
+.right{display:flex;gap:18px;justify-content:flex-end;align-items:end;flex-wrap:wrap}
+button,input,label,select{font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;font-weight:300;color:var(--charcoal)}
+button{appearance:none;border:0;background:transparent;padding:4px 0;font-size:11px;letter-spacing:.13em;text-transform:uppercase;cursor:pointer;color:var(--charcoal)}
+button:hover,button.active{color:var(--deep);text-decoration:underline;text-underline-offset:5px}
+select,input[type="number"]{border:0;border-bottom:.5px solid var(--stone);background:transparent;border-radius:0;outline:none;color:var(--charcoal);font-size:12px;padding:4px 0 5px;text-transform:uppercase;letter-spacing:.13em}
+input[type="number"]{width:58px;text-align:center}select{width:86px}
+.stage{min-height:0;padding:18px clamp(18px,3vw,42px) 16px;display:grid}
+.instrument{min-width:0;min-height:0;border:.5px solid var(--edge);background:var(--lace);position:relative;display:grid;grid-template-rows:minmax(0,1fr)}
+.instrument:before{content:"02 / Fold";position:absolute;top:-12px;right:12px;font-size:9px;letter-spacing:.15em;color:var(--charcoal);background:var(--lace);padding:0 6px;opacity:.68}
+canvas{width:100%;height:100%;display:block;background:var(--lace);cursor:crosshair;touch-action:none}
+.footer{border-top:.5px solid var(--hair);display:grid;grid-template-columns:1fr auto 1fr;gap:18px;align-items:center;padding:12px clamp(18px,3vw,42px) 16px;font-size:11px;letter-spacing:.13em;text-transform:uppercase}
+.footerLeft,.footerRight{display:flex;gap:18px;align-items:center;flex-wrap:wrap}.footerLeft{justify-content:flex-start}.footerRight{justify-content:flex-end}
+.transport{display:flex;gap:22px;align-items:center;justify-content:center;flex-wrap:wrap}.slots{display:flex;gap:10px;align-items:center}
+.slot{min-width:18px;height:18px;border:.5px solid var(--stone);border-radius:50%;display:grid;place-items:center;font-size:9px;line-height:1;color:var(--charcoal);background:var(--lace);cursor:pointer}
+.slot.filled{border-color:var(--charcoal)}.slot.active{background:var(--charcoal);color:var(--lace);border-color:var(--charcoal)}
+.status{min-width:126px;text-align:center;opacity:.74}.hint{opacity:.62}
+@media(max-width:960px){html,body{overflow:auto;height:auto;min-height:100%}body{display:block;padding:16px}.shell{width:100%;height:calc(100dvh - 32px);min-height:560px}.shell:before{display:none}.topbar{grid-template-columns:1fr;justify-items:start;padding:12px 18px;gap:10px}.right,.footerLeft,.footerRight,.transport{justify-content:flex-start}.footer{grid-template-columns:1fr;justify-items:start;padding:14px 18px 18px}}
+@media(max-width:560px){body{padding:0}.shell{border-left:0;border-right:0;height:100dvh}.stage{padding:28px 16px 16px}}
+</style>
+</head>
+<body>
+<div class="shell" id="shell" aria-label="Chord Fold Instrument">
+  <div class="topbar">
+    <div><div class="brand">CHORD FOLD INSTRUMENT</div></div>
+      <a href="./index.html" style="text-decoration:none;font-size:11px;letter-spacing:.13em;color:var(--charcoal)">COLLECTION</a>
+    <div class="right">
+      <label>KEY <select id="key"><option>C</option><option>C#</option><option>D</option><option>Eb</option><option>E</option><option>F</option><option>F#</option><option>G</option><option>Ab</option><option>A</option><option>Bb</option><option>B</option></select></label>
+      <label>DENSITY <select id="density"><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option></select></label>
+      <label>BPM <input id="bpm" type="number" value="72" min="20" max="240"></label>
+      <button id="full" type="button">FULL</button>
+    </div>
+  </div>
+  <main class="stage"><section class="instrument"><canvas id="fold" aria-label="Playable harmonic fold surface"></canvas></section></main>
+  <div class="footer">
+    <div class="footerLeft"><span class="hint">TOUCH + DRAG = FOLD</span><span class="hint">A4=440</span></div>
+    <div class="transport"><button id="play">PLAY</button><button id="playStates">PLAY STATES</button><button id="stop">STOP</button><button id="clear">CLEAR</button><span id="status" class="status">READY</span></div>
+    <div class="footerRight"><button id="store">STORE</button><div class="slots" id="slots"></div><button id="exportMidi">EXPORT MIDI</button><button id="exportPng">EXPORT PNG</button></div>
+  </div>
+</div>
+<script>
+(() => {
+  const canvas = document.getElementById('fold');
+  const ctx = canvas.getContext('2d', { alpha:false });
+  const shell = document.getElementById('shell');
+  const keyEl = document.getElementById('key');
+  const densityEl = document.getElementById('density');
+  const bpmEl = document.getElementById('bpm');
+  const statusEl = document.getElementById('status');
+  const slotsEl = document.getElementById('slots');
+  const playBtn = document.getElementById('play');
+  const playStatesBtn = document.getElementById('playStates');
+  const stopBtn = document.getElementById('stop');
+  const clearBtn = document.getElementById('clear');
+  const storeBtn = document.getElementById('store');
+  const exportMidiBtn = document.getElementById('exportMidi');
+  const exportPngBtn = document.getElementById('exportPng');
+  const fullBtn = document.getElementById('full');
+
+  const LACE = '#F4F1EA', STONE = '#C7C6C1', INK = '#686763', DEEP = '#3A3A37';
+  const keyMap = {"C":0,"C#":1,"D":2,"Eb":3,"E":4,"F":5,"F#":6,"G":7,"Ab":8,"A":9,"Bb":10,"B":11};
+  const minor = [0,2,3,5,7,8,10];
+  const names = ['C','C#','D','Eb','E','F','F#','G','Ab','A','Bb','B'];
+  const A4_HZ = 440, A4_MIDI = 69;
+  let W = 1, H = 1, dpr = 1, AC = null, master = null;
+  let anchor = {x:.36,y:.58}, pointer = {x:.72,y:.34}, dragging = false;
+  let currentState = null, lastAudition = 0, selectedSlot = 0, seqTimer = null, seqIndex = 0;
+  const snapshots = new Array(8).fill(null);
+
+  function audio(){
+    if(!AC){
+      AC = new (window.AudioContext || window.webkitAudioContext)();
+      master = AC.createGain();
+      master.gain.value = 0.22;
+      const comp = AC.createDynamicsCompressor();
+      comp.threshold.value = -18;
+      comp.ratio.value = 4;
+      master.connect(comp).connect(AC.destination);
+    }
+    return AC;
+  }
+  function midiToHz(midi){ return A4_HZ * Math.pow(2, (midi - A4_MIDI) / 12); }
+  function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+  function currentRoot(){ return keyMap[keyEl.value] || 0; }
+  function scalePitches(min=24,max=108){
+    const root = currentRoot(), out = [];
+    for(let o=-2;o<10;o++){
+      for(const n of minor){
+        const m = root + n + o*12;
+        if(m>=min && m<=max) out.push(m);
+      }
+    }
+    return out.sort((a,b)=>a-b);
+  }
+  function quantize(midi){
+    const pitches = scalePitches(24,108);
+    let best = pitches[0], bd = Infinity;
+    for(const m of pitches){
+      const d = Math.abs(midi-m);
+      if(d<bd){ bd=d; best=m; }
+    }
+    return best;
+  }
+  function byScaleStep(baseMidi, steps){
+    const pitches = scalePitches(24,108);
+    const base = quantize(baseMidi);
+    let idx = 0, bd = Infinity;
+    pitches.forEach((m,i)=>{
+      const d = Math.abs(m-base);
+      if(d<bd){ bd=d; idx=i; }
+    });
+    return pitches[clamp(idx+steps, 0, pitches.length-1)];
+  }
+  function noteName(midi){
+    const pc = ((Math.round(midi)%12)+12)%12;
+    const oct = Math.floor(Math.round(midi)/12)-1;
+    return names[pc] + oct;
+  }
+  function resize(){
+    const r = canvas.getBoundingClientRect();
+    dpr = Math.max(1, window.devicePixelRatio || 1);
+    W = Math.max(1, Math.floor(r.width));
+    H = Math.max(1, Math.floor(r.height));
+    canvas.width = Math.floor(W*dpr);
+    canvas.height = Math.floor(H*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  function pos(e){
+    const r = canvas.getBoundingClientRect();
+    return {x:clamp((e.clientX-r.left)/r.width,0,1), y:clamp((e.clientY-r.top)/r.height,0,1)};
+  }
+  function rootMidiFromAnchor(a){
+    const degree = clamp(Math.floor(a.x * minor.length), 0, minor.length-1);
+    const octave = 3 + Math.floor((1-a.y) * 3.01);
+    return quantize((octave+1)*12 + currentRoot() + minor[degree]);
+  }
+  function computeState(a=anchor, p=pointer){
+    const dx = p.x-a.x, dy = p.y-a.y;
+    const dist = clamp(Math.sqrt(dx*dx + dy*dy), .02, 1.2);
+    const spread = clamp(dist*1.55, 0, 1);
+    const tension = clamp(Math.abs(p.x-.5)*1.35 + Math.abs(p.y-.5)*.7, 0, 1);
+    const angle = Math.atan2(dy, dx);
+    const inversion = clamp(Math.round((a.y-p.y)*4), -2, 2);
+    const density = parseInt(densityEl.value, 10) || 3;
+    const rootMidi = rootMidiFromAnchor(a);
+    const sets = {2:[0,4],3:[0,2,4],4:[0,2,4,6],5:[0,2,4,6,8]};
+    let tones = sets[density].map(step => byScaleStep(rootMidi, step));
+
+    tones = tones.map((m,i)=>{
+      let extra = 0;
+      if(spread>.38 && i>=2) extra += 12;
+      if(spread>.68 && i>=3) extra += 12;
+      if(tension>.78 && i===tones.length-1) extra += 12;
+      return clamp(m + extra, 24, 108);
+    });
+
+    if(inversion>0){
+      for(let i=0;i<inversion;i++){ tones.sort((a,b)=>a-b); tones[0] += 12; }
+    } else if(inversion<0){
+      for(let i=0;i<Math.abs(inversion);i++){ tones.sort((a,b)=>a-b); tones[tones.length-1] -= 12; }
+    }
+    tones = tones.map(quantize).sort((a,b)=>a-b);
+    return {key:keyEl.value,scale:'minor',density,rootMidi,tones,angle,spread,tension,inversion,anchor:{x:a.x,y:a.y},pointer:{x:p.x,y:p.y},createdAt:Date.now()};
+  }
+  function stateGeometry(state){
+    const a = state.anchor, p = state.pointer;
+    let vx = p.x-a.x, vy = p.y-a.y;
+    let len = Math.sqrt(vx*vx + vy*vy);
+    if(len < .001){ vx = .32; vy = -.18; len = Math.sqrt(vx*vx+vy*vy); }
+    const ux = vx/len, uy = vy/len, nx = -uy, ny = ux;
+    const foldLen = clamp(len, .16, .9);
+    const cx = a.x*W, cy = a.y*H;
+    const x2 = (a.x + ux*foldLen)*W, y2 = (a.y + uy*foldLen)*H;
+    const nodes = state.tones.map((m,i)=>{
+      const t = state.tones.length===1 ? 0 : i/(state.tones.length-1);
+      const center = (t-.5);
+      const normal = center * (32 + state.spread*90);
+      const along = t * foldLen;
+      return {midi:m,x:(a.x + ux*along)*W + nx*normal,y:(a.y + uy*along)*H + ny*normal,ghostX:(a.x + ux*along)*W - nx*normal*.62,ghostY:(a.y + uy*along)*H - ny*normal*.62};
+    });
+    return {x1:cx,y1:cy,x2,y2,nodes,nx,ny,ux,uy};
+  }
+  function drawGrid(){
+    ctx.fillStyle = LACE; ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle = '#959491'; ctx.globalAlpha = .55; ctx.lineWidth = .5;
+    for(let i=1;i<12;i++){ const x=W*i/12; ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+    for(let i=1;i<8;i++){ const y=H*i/8; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = 'rgba(104,103,99,.34)'; ctx.lineWidth = .75;
+    ctx.beginPath(); ctx.moveTo(W*.5,0); ctx.lineTo(W*.5,H); ctx.stroke();
+    ctx.fillStyle = 'rgba(104,103,99,.05)'; ctx.fillRect(W*.5-1,0,2,H);
+  }
+  function drawState(state){
+    if(!state) return;
+    const g = stateGeometry(state);
+    ctx.save(); ctx.globalAlpha = .75;
+    ctx.fillStyle = 'rgba(104,103,99,.045)';
+    ctx.beginPath(); ctx.moveTo(g.x1,g.y1); ctx.lineTo(g.x2,g.y2); ctx.lineTo(g.x2 + g.nx*72*state.spread, g.y2 + g.ny*72*state.spread); ctx.lineTo(g.x1 + g.nx*36*state.spread, g.y1 + g.ny*36*state.spread); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(104,103,99,.032)';
+    ctx.beginPath(); ctx.moveTo(g.x1,g.y1); ctx.lineTo(g.x2,g.y2); ctx.lineTo(g.x2 - g.nx*54*state.spread, g.y2 - g.ny*54*state.spread); ctx.lineTo(g.x1 - g.nx*28*state.spread, g.y1 - g.ny*28*state.spread); ctx.closePath(); ctx.fill();
+    ctx.restore();
+
+    ctx.strokeStyle = 'rgba(58,58,55,.78)'; ctx.lineWidth = 1.1;
+    ctx.beginPath(); ctx.moveTo(g.x1,g.y1); ctx.lineTo(g.x2,g.y2); ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(58,58,55,.72)'; ctx.lineWidth = .8;
+    ctx.beginPath(); ctx.arc(g.x1,g.y1,9,0,Math.PI*2); ctx.stroke();
+    ctx.fillStyle = DEEP; ctx.beginPath(); ctx.arc(g.x1,g.y1,2.5,0,Math.PI*2); ctx.fill();
+
+    g.nodes.forEach((n,i)=>{ ctx.strokeStyle = 'rgba(104,103,99,.20)'; ctx.lineWidth = .6; ctx.beginPath(); ctx.arc(n.ghostX,n.ghostY,6+i*.7,0,Math.PI*2); ctx.stroke(); });
+
+    g.nodes.forEach((n,i)=>{
+      const r = 5.5 + i*.8;
+      ctx.strokeStyle = 'rgba(58,58,55,.82)'; ctx.fillStyle = i===0 ? DEEP : LACE; ctx.lineWidth = .8;
+      ctx.beginPath(); ctx.arc(n.x,n.y,r,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = 'rgba(58,58,55,.32)'; ctx.beginPath(); ctx.moveTo(g.x1,g.y1); ctx.lineTo(n.x,n.y); ctx.stroke();
+      ctx.fillStyle = 'rgba(104,103,99,.76)'; ctx.font = '9px "Helvetica Neue", Arial, sans-serif'; ctx.fillText(noteName(n.midi), n.x+9, n.y-8);
+    });
+
+    const readout = `${state.key} MINOR  /  DENSITY ${state.density}  /  INV ${state.inversion}`;
+    ctx.fillStyle = 'rgba(104,103,99,.78)'; ctx.font = '10px "Helvetica Neue", Arial, sans-serif'; ctx.fillText(readout, 18, H-18);
+  }
+  function drawSnapshots(){
+    snapshots.forEach((s,i)=>{
+      if(!s) return;
+      const g = stateGeometry(s);
+      ctx.save(); ctx.globalAlpha = .22; ctx.strokeStyle = DEEP; ctx.lineWidth = .7;
+      ctx.beginPath(); ctx.moveTo(g.x1,g.y1); ctx.lineTo(g.x2,g.y2); ctx.stroke();
+      g.nodes.forEach(n=>{ ctx.beginPath(); ctx.arc(n.x,n.y,3,0,Math.PI*2); ctx.stroke(); });
+      ctx.restore();
+    });
+  }
+  function draw(){ drawGrid(); drawSnapshots(); drawState(currentState); requestAnimationFrame(draw); }
+  function playChord(state=currentState, dur=1.35){
+    if(!state) return;
+    const ac = audio(); if(ac.state === 'suspended') ac.resume();
+    const now = ac.currentTime, g = stateGeometry(state);
+    state.tones.forEach((midi,i)=>{
+      const osc = ac.createOscillator(), osc2 = ac.createOscillator(), gain = ac.createGain(), pan = ac.createStereoPanner();
+      const f = midiToHz(midi), xNorm = clamp((g.nodes[i]?.x || W*.5)/W,0,1), vel = .72 - i*.035 + state.tension*.08;
+      osc.type = 'sine'; osc2.type = 'triangle';
+      osc.frequency.setValueAtTime(f, now); osc2.frequency.setValueAtTime(f * Math.pow(2, (3+i*2)/1200), now);
+      pan.pan.value = (xNorm*2-1) * (.18 + state.spread*.52);
+      gain.gain.setValueAtTime(.0001, now);
+      gain.gain.linearRampToValueAtTime(.05*vel, now + .035 + i*.008);
+      gain.gain.linearRampToValueAtTime(.038*vel, now + dur*.62);
+      gain.gain.exponentialRampToValueAtTime(.0001, now + dur);
+      osc.connect(gain); osc2.connect(gain); gain.connect(pan).connect(master);
+      osc.start(now + i*.006); osc2.start(now + i*.006); osc.stop(now + dur + .05); osc2.stop(now + dur + .05);
+    });
+    status(`PLAY ${state.tones.map(noteName).join(' ')}`);
+  }
+  function status(text){ statusEl.textContent = text; }
+  function storeSelected(){
+    if(!currentState) return;
+    snapshots[selectedSlot] = JSON.parse(JSON.stringify(currentState));
+    renderSlots(); status(`STORED ${selectedSlot+1}`);
+  }
+  function recallSlot(i){
+    selectedSlot = i;
+    if(snapshots[i]){
+      currentState = JSON.parse(JSON.stringify(snapshots[i]));
+      anchor = {...currentState.anchor}; pointer = {...currentState.pointer}; keyEl.value = currentState.key; densityEl.value = String(currentState.density);
+      playChord(currentState,.9); status(`RECALL ${i+1}`);
+    } else if(currentState){ snapshots[i] = JSON.parse(JSON.stringify(currentState)); status(`STORED ${i+1}`); }
+    renderSlots();
+  }
+  function renderSlots(){
+    slotsEl.innerHTML = '';
+    snapshots.forEach((s,i)=>{
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'slot' + (s ? ' filled' : '') + (i===selectedSlot ? ' active' : ''); b.textContent = String(i+1);
+      b.title = s ? `Recall state ${i+1}` : `Store current state ${i+1}`;
+      b.addEventListener('click',()=>recallSlot(i)); slotsEl.appendChild(b);
+    });
+  }
+  function playSequence(){
+    const states = snapshots.filter(Boolean);
+    if(states.length === 0){ playChord(currentState); return; }
+    stopSequence();
+    const bpm = parseFloat(bpmEl.value) || 72, interval = 60000 / bpm;
+    seqIndex = 0;
+    const tick = () => {
+      const statesNow = snapshots.filter(Boolean);
+      if(statesNow.length === 0){ stopSequence(); return; }
+      const s = statesNow[seqIndex % statesNow.length];
+      currentState = JSON.parse(JSON.stringify(s)); anchor = {...currentState.anchor}; pointer = {...currentState.pointer};
+      playChord(currentState, Math.max(.65, interval/1000*.9));
+      seqIndex++; seqTimer = setTimeout(tick, interval);
+    };
+    tick(); playStatesBtn.classList.add('active');
+  }
+  function stopSequence(){ if(seqTimer) clearTimeout(seqTimer); seqTimer = null; playStatesBtn.classList.remove('active'); status('STOP'); }
+  function clearAll(){ stopSequence(); currentState = null; snapshots.fill(null); anchor = {x:.36,y:.58}; pointer = {x:.72,y:.34}; renderSlots(); status('CLEAR'); }
+  function updateFromPointer(p, audition=false){
+    pointer = p; currentState = computeState(anchor, pointer);
+    if(audition){
+      const now = performance.now();
+      if(now - lastAudition > 180){ playChord(currentState, .75); lastAudition = now; }
+    }
+  }
+  canvas.addEventListener('pointerdown', e => { dragging = true; canvas.setPointerCapture(e.pointerId); anchor = pos(e); pointer = {x:clamp(anchor.x+.22,0,1), y:clamp(anchor.y-.16,0,1)}; currentState = computeState(anchor, pointer); playChord(currentState, .85); });
+  canvas.addEventListener('pointermove', e => { if(!dragging) return; updateFromPointer(pos(e), true); });
+  canvas.addEventListener('pointerup', e => { if(dragging){ updateFromPointer(pos(e), false); playChord(currentState, 1.25); } dragging = false; });
+  canvas.addEventListener('pointercancel', () => { dragging = false; });
+
+  playBtn.addEventListener('click', () => playChord(currentState || computeState()));
+  playStatesBtn.addEventListener('click', () => { if(seqTimer) stopSequence(); else playSequence(); });
+  stopBtn.addEventListener('click', stopSequence);
+  clearBtn.addEventListener('click', clearAll);
+  storeBtn.addEventListener('click', storeSelected);
+  fullBtn.addEventListener('click', () => {
+    if(!document.fullscreenElement && !document.webkitFullscreenElement){ (shell.requestFullscreen || shell.webkitRequestFullscreen).call(shell); fullBtn.textContent = 'EXIT'; }
+    else { (document.exitFullscreen || document.webkitExitFullscreen).call(document); fullBtn.textContent = 'FULL'; }
+  });
+  document.addEventListener('fullscreenchange',()=>{ fullBtn.textContent = document.fullscreenElement ? 'EXIT' : 'FULL'; });
+  keyEl.addEventListener('change',()=>{ currentState = computeState(anchor,pointer); playChord(currentState,.9); });
+  densityEl.addEventListener('change',()=>{ currentState = computeState(anchor,pointer); playChord(currentState,.9); });
+
+  function writeU32(n){ return [(n>>>24)&255,(n>>>16)&255,(n>>>8)&255,n&255]; }
+  function writeU16(n){ return [(n>>>8)&255,n&255]; }
+  function vlq(n){ let bytes = [n & 0x7f]; n >>= 7; while(n > 0){ bytes.unshift((n & 0x7f) | 0x80); n >>= 7; } return bytes; }
+  function midiBytesForStates(states){
+    const ppq = 480, bpm = clamp(parseFloat(bpmEl.value)||72, 20, 240), tempo = Math.round(60000000 / bpm), track = [];
+    function push(...arr){ track.push(...arr); }
+    push(0x00,0xff,0x03,0x0a, ...Array.from(new TextEncoder().encode('CHORD FOLD')));
+    push(0x00,0xff,0x51,0x03, (tempo>>16)&255, (tempo>>8)&255, tempo&255);
+    states.forEach((s,idx)=>{
+      const vel = 78;
+      s.tones.forEach((m,i)=>{ push(...vlq(i===0 && idx===0 ? 0 : 0), 0x90, clamp(Math.round(m),0,127), vel); });
+      s.tones.forEach((m,i)=>{ push(...vlq(i===0 ? ppq : 0), 0x80, clamp(Math.round(m),0,127), 0x40); });
+    });
+    push(0x00,0xff,0x2f,0x00);
+    return new Uint8Array([0x4d,0x54,0x68,0x64, ...writeU32(6), ...writeU16(0), ...writeU16(1), ...writeU16(ppq), 0x4d,0x54,0x72,0x6b, ...writeU32(track.length), ...track]);
+  }
+  function downloadBlob(blob, filename){
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 800);
+  }
+  exportMidiBtn.addEventListener('click',()=>{
+    const states = snapshots.filter(Boolean), out = states.length ? states : [currentState || computeState()];
+    downloadBlob(new Blob([midiBytesForStates(out)], {type:'audio/midi'}), 'chord_fold_progression.mid'); status('MIDI EXPORTED');
+  });
+  exportPngBtn.addEventListener('click',()=>{ canvas.toBlob(blob => { if(blob) downloadBlob(blob, 'chord_fold_score.png'); }, 'image/png'); status('PNG EXPORTED'); });
+
+  addEventListener('resize', resize);
+  resize(); currentState = computeState(anchor,pointer); renderSlots(); draw();
+})();
+</script>
+</body>
+</html>

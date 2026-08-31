@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Sound Analyzer</title>
+<link rel="stylesheet" href="./assets/theme.css" />
+<style>
+  /* local aliases onto the shared theme tokens — kept because the
+     analysis/drawing code below reads these via getComputedStyle() */
+  :root{ --cream: var(--paper); --blue: var(--accent-a); --pink: var(--accent-b); --grey: var(--stone); }
+  .controls{
+    display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding:14px 16px;
+    border:1px solid var(--stone); background:var(--paper-lift); border-radius:var(--radius);
+  }
+  .controls label{
+    display:flex; align-items:center; gap:8px; background:var(--paper);
+    border:1px solid var(--stone); padding:7px 10px; border-radius:var(--radius-sm);
+    font-size:11px; letter-spacing:.04em; color:var(--ink);
+  }
+  .controls input[type="range"]{ width:110px; }
+  .controls input[type="number"]{ width:64px; }
+  .controls button, .controls select, .controls input[type="number"]{
+    border:1px solid var(--stone); background:var(--paper-lift); padding:7px 10px; border-radius:var(--radius-sm);
+    cursor:pointer; font-size:11px; letter-spacing:.04em;
+  }
+  .controls button{ text-transform:uppercase; letter-spacing:.06em; border-color:var(--ink-strong); color:var(--ink-strong); }
+  .controls button:hover{ background:var(--ink-strong); color:var(--paper); }
+  .row{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  canvas{ width:100%; height:280px; background:var(--paper-lift); border:1px solid var(--stone); border-radius:var(--radius); display:block; }
+  #spec{ height:320px; }
+  .hint{opacity:.7; font-size:11px; letter-spacing:.04em; text-transform:uppercase;}
+  @media (max-width:900px){ .row{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1 class="title">Sound Analyzer</h1>
+      <div class="sub">Mel spectrogram, chroma, and onset detection — export to JSON / CSV / MIDI</div>
+    </div>
+    <div class="hint" style="text-align:right">1 Time · 2 Spectrum · 3 Mel · 4 Chroma · Space Pause<br><a class="textBtn" href="./index.html">Collection</a></div>
+  </header>
+  <div class="converge-bar"></div>
+
+  <div class="controls">
+    <label><span>Audio File</span><input id="file" type="file" accept="audio/*"></label>
+    <label>Mode
+      <select id="mode">
+        <option value="time">Time</option>
+        <option value="spectrum">Spectrum</option>
+        <option value="mel" selected>Mel</option>
+        <option value="chroma">Chroma</option>
+      </select>
+    </label>
+    <label>FFT 2^<select id="fft">
+      <option>11</option><option selected>12</option><option>13</option><option>14</option><option>15</option>
+    </select></label>
+    <label>Bands
+      <select id="bands">
+        <option>32</option><option selected>40</option><option>64</option>
+      </select>
+    </label>
+    <label>Hop (ms)<input id="hop" type="number" min="10" max="80" value="50"></label>
+    <label>Gain<input id="gain" type="range" min="0" max="2" step="0.01" value="1"></label>
+    <label>Smooth<input id="smooth" type="range" min="0" max="0.95" step="0.01" value="0.7"></label>
+
+    <label>BPM<input id="bpm" type="number" min="40" max="200" value="90"></label>
+    <label>Root
+      <select id="root">
+        <option>C</option><option>C#</option><option>D</option><option>D#</option><option>E</option><option>F</option>
+        <option>F#</option><option>G</option><option>G#</option><option>A</option><option>A#</option><option>B</option>
+      </select>
+    </label>
+    <label>Scale
+      <select id="scale">
+        <option value="major">Major</option>
+        <option value="minor" selected>Minor</option>
+        <option value="pent">Pentatonic</option>
+        <option value="chromatic">Chromatic</option>
+      </select>
+    </label>
+
+    <button id="start">Start Capture</button>
+    <button id="stop">Stop</button>
+    <button id="export-mel">Export Mel JSON</button>
+    <button id="export-chroma">Export Chroma JSON</button>
+    <button id="export-onsets">Export Onsets CSV</button>
+    <button id="export-summary">Export Summary JSON</button>
+    <button id="export-midi">Export MIDI</button>
+    <button id="snap">Snapshot PNG</button>
+    <button id="clear">Clear</button>
+  </div>
+
+  <div class="grid" style="margin-top:12px">
+    <canvas id="spec"></canvas>
+    <div class="row">
+      <canvas id="time"></canvas>
+      <canvas id="aux"></canvas>
+    </div>
+  </div>
+
+  <footer class="meta">
+    Web Audio + Canvas · no external libraries
+  </footer>
+</div>
+
+<script>
+(() => {
+  // Palette
+  const CREAM=getCSS('--cream'), BLUE=getCSS('--blue'), PINK=getCSS('--pink'), GREY=getCSS('--grey'), INK=getCSS('--ink');
+
+  // UI
+  const fileInput = document.getElementById('file');
+  const modeSel = document.getElementById('mode');
+  const fftSel = document.getElementById('fft');
+  const bandsSel = document.getElementById('bands');
+  const hopInput = document.getElementById('hop');
+  const gainCtl = document.getElementById('gain');
+  const smoothCtl = document.getElementById('smooth');
+  const bpmInput = document.getElementById('bpm');
+  const rootSel = document.getElementById('root');
+  const scaleSel = document.getElementById('scale');
+
+  const btnStart = document.getElementById('start');
+  const btnStop = document.getElementById('stop');
+  const btnMel = document.getElementById('export-mel');
+  const btnChroma = document.getElementById('export-chroma');
+  const btnOnsets = document.getElementById('export-onsets');
+  const btnSummary = document.getElementById('export-summary');
+  const btnMIDI = document.getElementById('export-midi');
+  const btnSnap = document.getElementById('snap');
+  const btnClear = document.getElementById('clear');
+
+  const cvsSpec = document.getElementById('spec');
+  const cvsTime = document.getElementById('time');
+  const cvsAux = document.getElementById('aux');
+  let ctxSpec = fitCanvas(cvsSpec);
+  let ctxTime = fitCanvas(cvsTime);
+  let ctxAux = fitCanvas(cvsAux);
+
+  // Audio
+  let AC, gainNode, analyser, analyserL, analyserR, srcNode, splitter, merger;
+  let paused=false, rafId=null, currentMode=modeSel.value;
+  let melFrames=[], chromaFrames=[], onsetTimes=[], onsetStrengths=[];
+  let melConfig={ bands:40, hop:0.05 }, lastCapture=0, melFilter=null;
+  let lastMag=null, fluxSeries=[], energySeries=[], startTime=null, audioStartTime=0;
+  let sampleRate=44100;
+
+  // MIDI helpers
+  const ROOTS={"C":0,"C#":1,"D":2,"D#":3,"E":4,"F":5,"F#":6,"G":7,"G#":8,"A":9,"A#":10,"B":11};
+  const SCALES={ major:[0,2,4,5,7,9,11], minor:[0,2,3,5,7,8,10], pent:[0,2,4,7,9], chromatic:[0,1,2,3,4,5,6,7,8,9,10,11] };
+
+  // Events
+  window.addEventListener('resize', () => { ctxSpec = fitCanvas(cvsSpec); ctxTime = fitCanvas(cvsTime); ctxAux = fitCanvas(cvsAux); });
+
+  modeSel.addEventListener('change', e => { currentMode = e.target.value; });
+  gainCtl.addEventListener('input', e => { if(gainNode) gainNode.gain.value = parseFloat(e.target.value); });
+  smoothCtl.addEventListener('input', e => { setSmooth(parseFloat(e.target.value)); });
+  fftSel.addEventListener('change', e => { setFFT(parseInt(e.target.value,10)); melFilter=null; });
+  bandsSel.addEventListener('change', e => { melConfig.bands=parseInt(e.target.value,10); melFilter=null; });
+  hopInput.addEventListener('change', e => { melConfig.hop = Math.max(0.01, Math.min(0.08, parseFloat(e.target.value)/1000)); });
+
+  btnStart.addEventListener('click', () => { startCapture(); });
+  btnStop.addEventListener('click', () => { stopCapture(); });
+  btnMel.addEventListener('click', () => downloadJSON({frames:melFrames, bands:melConfig.bands}, "mel_frames.json"));
+  btnChroma.addEventListener('click', () => downloadJSON({frames:chromaFrames}, "chroma_frames.json"));
+  btnOnsets.addEventListener('click', () => downloadCSV(onsetTimes, onsetStrengths, "onsets.csv"));
+  btnSummary.addEventListener('click', () => downloadJSON(buildSummary(), "summary.json"));
+  btnMIDI.addEventListener('click', () => exportMIDI());
+  btnSnap.addEventListener('click', () => snapshot());
+  btnClear.addEventListener('click', () => { melFrames=[]; chromaFrames=[]; onsetTimes=[]; onsetStrengths=[]; fluxSeries=[]; energySeries=[]; });
+
+  // File load
+  fileInput.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0]; if(!file) return;
+    ensureAudio();
+    stopSource();
+    const url = URL.createObjectURL(file);
+    const buf = await fetch(url).then(r=>r.arrayBuffer()).then(ab => AC.decodeAudioData(ab));
+    const node = AC.createBufferSource();
+    node.buffer = buf; node.loop = true;
+    sampleRate = buf.sampleRate;
+    wireSource(node);
+    node.start(0);
+    srcNode = node; startTime = performance.now(); audioStartTime = AC.currentTime;
+    kick();
+  });
+
+  // Audio plumbing
+  function ensureAudio(){
+    if (AC) return;
+    AC = new (window.AudioContext || window.webkitAudioContext)();
+    gainNode = AC.createGain();
+    analyser = AC.createAnalyser();
+    analyserL = AC.createAnalyser();
+    analyserR = AC.createAnalyser();
+    setFFT(parseInt(fftSel.value,10)); setSmooth(parseFloat(smoothCtl.value));
+  }
+  function wireSource(node){
+    splitter = AC.createChannelSplitter(2);
+    node.connect(splitter);
+    splitter.connect(analyserL,0);
+    splitter.connect(analyserR,1);
+    const merger = AC.createChannelMerger(2);
+    analyserL.connect(merger,0,0);
+    analyserR.connect(merger,0,1);
+    merger.connect(analyser);
+    analyser.connect(gainNode).connect(AC.destination);
+  }
+  function setSmooth(v){ [analyser, analyserL, analyserR].forEach(a => a.smoothingTimeConstant = v); }
+  function setFFT(p){ const size = Math.pow(2,p); [analyser, analyserL, analyserR].forEach(a => a.fftSize=size); }
+
+  function stopSource(){
+    try{ if (srcNode && srcNode.stop) srcNode.stop(); }catch(e){}
+    srcNode=null;
+  }
+
+  // Render loop
+  function kick(){ if(rafId) cancelAnimationFrame(rafId); loop(); }
+  function loop(){
+    drawSpec();
+    drawTime();
+    drawAux();
+    rafId = requestAnimationFrame(loop);
+  }
+
+  // Drawing helpers
+  function drawGrid(cx,w,h,rows=8,cols=12){
+    cx.fillStyle=getCSS('--paper-lift') || '#fff'; cx.fillRect(0,0,w,h);
+    cx.strokeStyle=GREY; cx.lineWidth=1; cx.beginPath();
+    for(let i=1;i<cols;i++){ const x=(w/cols)*i; cx.moveTo(x,0); cx.lineTo(x,h); }
+    for(let j=1;j<rows;j++){ const y=(h/rows)*j; cx.moveTo(0,y); cx.lineTo(w,y); }
+    cx.stroke();
+  }
+
+  function drawSpec(){
+    const w=cvsSpec.clientWidth, h=cvsSpec.clientHeight;
+    drawGrid(ctxSpec,w,h,8,12);
+    if(!analyser) return;
+    if(currentMode==='time'){ drawTimeDomain(ctxSpec,w,h,PINK,3,analyser); return; }
+    if(currentMode==='spectrum'){ drawSpectrumBars(ctxSpec,w,h,BLUE,analyser); return; }
+    // Mel/Chroma: draw smoothed heat view
+    const n=analyser.frequencyBinCount;
+    const mag = new Float32Array(n);
+    analyser.getFloatFrequencyData(mag); // in dB
+    const db = mag; // alias
+    if(!melFilter) melFilter = buildMelFilter(n, sampleRate, melConfig.bands, 20, sampleRate/2);
+    const mel = applyMel(db, melFilter); // linear magnitudes per band
+    // push capture with hop
+    const now=AC.currentTime;
+    if (startTime && now - (audioStartTime||0) >= (lastCapture + melConfig.hop)){
+      lastCapture += melConfig.hop;
+      const t = now - (audioStartTime||0);
+      melFrames.push({t, mel:Array.from(mel)});
+      // chroma
+      const chroma = melToChroma(mel);
+      chromaFrames.push({t, chroma:Array.from(chroma)});
+      // onset via spectral flux
+      const flux = spectralFlux(mel, lastMag); if(flux!==null){ fluxSeries.push({t, flux}); }
+      const energy = mel.reduce((a,b)=>a+b,0); energySeries.push({t, energy});
+      if(lastMag) {
+        const isOn = detectOnset(fluxSeries); if(isOn){ onsetTimes.push(t); onsetStrengths.push(fluxSeries[fluxSeries.length-1].flux); }
+      }
+      lastMag = mel.slice();
+    }
+    // Draw
+    if(currentMode==='mel'){ drawMel(ctxSpec, w, h, mel); }
+    if(currentMode==='chroma'){
+      drawMel(ctxSpec, w, h, mel, 0.5);
+      drawChromaOverlay(ctxSpec, w, h, melToChroma(mel));
+    }
+  }
+
+  function drawTime(){
+    const w=cvsTime.clientWidth, h=cvsTime.clientHeight;
+    drawGrid(ctxTime,w,h);
+    if(!analyser) return;
+    drawTimeDomain(ctxTime,w,h,BLUE,3,analyser);
+  }
+  function drawAux(){
+    const w=cvsAux.clientWidth, h=cvsAux.clientHeight;
+    drawGrid(ctxAux,w,h);
+    if(!analyser) return;
+    drawSpectrumArea(ctxAux,w,h,PINK,analyser);
+    // overlay meters Low/Mid/High from last mel
+    if(melFrames.length>0){
+      const last=melFrames[melFrames.length-1].mel;
+      const thirds=Math.floor(last.length/3)||1;
+      const L=sum(last.slice(0,thirds)), M=sum(last.slice(thirds,2*thirds)), H=sum(last.slice(2*thirds));
+      const tot=L+M+H+1e-9;
+      ctxAux.fillStyle=INK||'#333'; ctxAux.font='12px "Helvetica Neue", Helvetica, Arial, sans-serif';
+      ctxAux.fillText(`L:${(L/tot*100).toFixed(1)}%  M:${(M/tot*100).toFixed(1)}%  H:${(H/tot*100).toFixed(1)}%`, 10, 20);
+    }
+  }
+
+  function drawTimeDomain(cx,w,h,color,lw,an){
+    const N=an.fftSize;
+    const buf=new Uint8Array(N);
+    an.getByteTimeDomainData(buf);
+    cx.lineWidth=lw; cx.strokeStyle=color; cx.beginPath();
+    for(let i=0;i<buf.length;i++){
+      const x = (i/(buf.length-1))*w;
+      const v = (buf[i]-128)/128;
+      const y = h/2 + v*(h*0.40);
+      (i===0)?cx.moveTo(x,y):cx.lineTo(x,y);
+    }
+    cx.stroke();
+  }
+  function drawSpectrumBars(cx,w,h,fill,an){
+    const n=an.frequencyBinCount, buf=new Uint8Array(n);
+    an.getByteFrequencyData(buf);
+    const barW = Math.max(1, w/n * 2.2);
+    cx.fillStyle=fill;
+    for(let i=0;i<n;i++){
+      const v=buf[i]/255, bh=v*h*0.92;
+      cx.fillRect(i*barW, h-bh, barW*0.9, bh);
+    }
+  }
+  function drawSpectrumArea(cx,w,h,fill,an){
+    const n=an.frequencyBinCount, buf=new Uint8Array(n);
+    an.getByteFrequencyData(buf);
+    cx.fillStyle=fill; cx.globalAlpha=0.8; cx.beginPath(); cx.moveTo(0,h);
+    for(let i=0;i<n;i++){ const x=(i/(n-1))*w; const v=buf[i]/255; const y=h - v*h*0.92; cx.lineTo(x,y); }
+    cx.lineTo(w,h); cx.closePath(); cx.fill(); cx.globalAlpha=1;
+  }
+  function drawMel(cx,w,h,mel,alpha=1){
+    const bands = mel.length;
+    const colW = w / bands;
+    for(let i=0;i<bands;i++){
+      const v = mel[i];
+      const y = h - Math.min(1, v)*h*0.9;
+      cx.fillStyle = mix(PINK, BLUE, v);
+      cx.globalAlpha = alpha;
+      cx.fillRect(i*colW, y, colW*0.98, h - y);
+    }
+    cx.globalAlpha=1;
+  }
+  function drawChromaOverlay(cx,w,h,chroma){
+    const bins = chroma.length;
+    const radius = Math.min(w,h)*0.38;
+    const cx0 = w*0.5, cy0 = h*0.5;
+    cx.lineWidth=8; cx.strokeStyle=BLUE; cx.beginPath();
+    for(let i=0;i<=bins;i++){
+      const t=(i%bins)/bins * Math.PI*2;
+      const r = radius * (0.25 + 0.75*chroma[i%bins]);
+      const X = cx0 + r*Math.cos(t), Y = cy0 + r*Math.sin(t);
+      (i===0)?cx.moveTo(X,Y):cx.lineTo(X,Y);
+    }
+    cx.stroke();
+  }
+
+  // Capture / analysis
+  function startCapture(){ lastCapture=0; melFrames=[]; chromaFrames=[]; onsetTimes=[]; onsetStrengths=[]; fluxSeries=[]; energySeries=[]; lastMag=null; }
+  function stopCapture(){ /* nothing — live capture stops when you stop playback */ }
+
+  function spectralFlux(cur, prev){
+    if(!prev) return null;
+    let sum=0;
+    for(let i=0;i<cur.length;i++){ const d = cur[i]-prev[i]; if(d>0) sum += d; }
+    return sum;
+  }
+  function detectOnset(series){
+    if(series.length<5) return false;
+    const n=series.length;
+    const last=series[n-1].flux;
+    const mean = series.slice(-5).reduce((a,b)=>a+b.flux,0)/5;
+    return last > mean*1.8; // simple adaptive gate
+  }
+
+  // Mel/chroma helpers
+  function hzToMel(hz){ return 2595 * Math.log10(1 + hz/700); }
+  function melToHz(m){ return 700*(Math.pow(10, m/2595)-1); }
+  function buildMelFilter(nfft2, sr, bands, fmin, fmax){
+    const mmin = hzToMel(fmin), mmax = hzToMel(fmax);
+    const mpts = new Array(bands+2).fill(0).map((_,i)=> mmin + (i*(mmax-mmin))/(bands+1));
+    const fpts = mpts.map(m=>melToHz(m));
+    const bins = fpts.map(f=> Math.floor((f/(sr/2))*nfft2) );
+    const F = Array.from({length:bands},()=> new Float32Array(nfft2).fill(0));
+    for(let b=0;b<bands;b++){
+      const left=bins[b], center=bins[b+1], right=bins[b+2];
+      for(let i=left;i<center;i++){ F[b][i] = (i-left)/(center-left+1e-9); }
+      for(let i=center;i<right;i++){ F[b][i] = (right-i)/(right-center+1e-9); }
+    }
+    return F;
+  }
+  function applyMel(db, F){
+    // db is negative dBFS; convert to linear magnitude
+    const n = db.length;
+    const mag = new Float32Array(n);
+    for(let i=0;i<n;i++){ const m = Math.pow(10, db[i]/20); mag[i] = isFinite(m)? m:0; }
+    const bands = F.length;
+    const out = new Float32Array(bands);
+    for(let b=0;b<bands;b++){
+      let s=0; const f=F[b]; for(let i=0;i<n;i++){ s += f[i]*mag[i]; }
+      out[b] = Math.max(0, s);
+    }
+    // normalize to 0..1
+    let maxv=0; for(let i=0;i<bands;i++){ if(out[i]>maxv) maxv=out[i]; }
+    if(maxv>0){ for(let i=0;i<bands;i++){ out[i]/=maxv; } }
+    return out;
+  }
+
+  function melToChroma(mel){
+    // crude mapping: fold mel bands into 12 bins by log frequency approximation
+    const bins = 12; const C = new Float32Array(bins);
+    for(let i=0;i<mel.length;i++){
+      // Map band index to frequency ratio; assume mel bands spaced -> approximate pitch class
+      const pc = i % bins;
+      C[pc] += mel[i];
+    }
+    // normalize
+    let max=0; for(let i=0;i<bins;i++){ if(C[i]>max) max=C[i]; }
+    if(max>0){ for(let i=0;i<bins;i++){ C[i]/=max; } }
+    return C;
+  }
+
+  // Exports
+  function downloadJSON(obj, name){
+    const blob = new Blob([JSON.stringify(obj)], {type:'application/json'});
+    const url = URL.createObjectURL(blob); const a=document.createElement('a');
+    a.href=url; a.download=name; a.click(); URL.revokeObjectURL(url);
+  }
+  function downloadCSV(times, strengths, name){
+    const rows = ["time,strength"].concat(times.map((t,i)=> `${t.toFixed(3)},${(strengths[i]||0).toFixed(6)}`)).join("\n");
+    const blob = new Blob([rows], {type:'text/csv'});
+    const url = URL.createObjectURL(blob); const a=document.createElement('a');
+    a.href=url; a.download=name; a.click(); URL.revokeObjectURL(url);
+  }
+  function buildSummary(){
+    const dur = melFrames.length? (melFrames[melFrames.length-1].t - melFrames[0].t):0;
+    const LMH = energySplit();
+    const tempos = tempoCandidates(onsetTimes);
+    return { frames:melFrames.length, bands:melConfig.bands, duration_sec:dur, low:LMH.low, mid:LMH.mid, high:LMH.high, bpm_candidates:tempos };
+  }
+  function energySplit(){
+    if(!melFrames.length) return {low:0,mid:0,high:0};
+    let L=0,M=0,H=0, tot=0;
+    melFrames.forEach(f=>{
+      const m=f.mel, third=Math.floor(m.length/3)||1;
+      const l=sum(m.slice(0,third)), md=sum(m.slice(third,2*third)), h=sum(m.slice(2*third));
+      L+=l; M+=md; H+=h; tot+=l+md+h;
+    });
+    return { low: L/tot, mid: M/tot, high: H/tot };
+  }
+  function tempoCandidates(times){
+    if(times.length<2) return [];
+    const its=[]; for(let i=1;i<times.length;i++){ its.push(times[i]-times[i-1]); }
+    its.sort((a,b)=>a-b);
+    const med = its[Math.floor(its.length/2)] || 0.5;
+    let bpm = med>0? 60/med : 120;
+    // fold to 60-180
+    while(bpm<60) bpm*=2; while(bpm>180) bpm/=2;
+    return [bpm.toFixed(1)];
+  }
+  function exportMIDI(){
+    if(onsetTimes.length===0){ alert('No onsets yet. Start capture and let audio run.'); return; }
+    const bpm = parseFloat(bpmInput.value)||90;
+    const root = ROOTS[rootSel.value];
+    const scale = SCALES[scaleSel.value];
+    const tpq = 480;
+    const usPerQ = Math.round(60000000 / bpm);
+
+    // Build notes from onsets using chroma peak for pitch class
+    const notes=[];
+    for(let i=0;i<onsetTimes.length;i++){
+      const t = onsetTimes[i];
+      const nearest = nearestFrame(chromaFrames, t);
+      let pc = 0;
+      if(nearest){
+        const arr = nearest.chroma;
+        let idx=0, max=-1; for(let k=0;k<12;k++){ if(arr[k]>max){ max=arr[k]; idx=k; } }
+        pc = idx;
+      }
+      // map pc to chosen scale
+      const scalePC = scale[Math.floor((pc/12)*scale.length)] || 0;
+      const midi = 60 + ((root + scalePC) % 12); // around C4
+      const durBeats = 0.5; // half beat
+      notes.push({t, midi, vel:96, dur:durBeats});
+    }
+
+    const bytes = buildSMF(notes, tpq, usPerQ);
+    const blob = new Blob([new Uint8Array(bytes)], {type:'audio/midi'});
+    const url = URL.createObjectURL(blob); const a=document.createElement('a');
+    a.href=url; a.download='sound_analyzer.mid'; a.click(); URL.revokeObjectURL(url);
+  }
+  function nearestFrame(frames, t){
+    if(!frames || frames.length===0) return null;
+    let best=null, bd=1e9;
+    for(const f of frames){ const d=Math.abs(f.t - t); if(d<bd){ bd=d; best=f; } }
+    return best;
+  }
+  function buildSMF(notes, tpq, usPerQ){
+    // Sort by time
+    notes = notes.slice().sort((a,b)=>a.t-b.t);
+    // Header MThd
+    const out=[]; function pushBytes(arr){ for(const v of arr) out.push(v&255); }
+    function vlq(n){ const bytes=[]; let buffer=n&0x7F; while((n>>=7)>0){ buffer<<=8; buffer|=((n&0x7F)|0x80); }
+      while(true){ bytes.push(buffer&0xFF); if(buffer&0x80) buffer>>=8; else break; } return bytes; }
+    function textMeta(type, data){ pushBytes([0xFF,type,...vlq(data.length),...data]); }
+    function tempoMeta(us){ pushBytes([0xFF,0x51,0x03,(us>>16)&255,(us>>8)&255,us&255]); }
+
+    // Header
+    pushBytes([0x4D,0x54,0x68,0x64, 0x00,0x00,0x00,0x06, 0x00,0x00, 0x00,0x01, (tpq>>8)&255, tpq&255]);
+    // Track chunk start
+    const track=[]; function tpush(v){ track.push(v&255); }
+    function tevent(delta, bytes){ for(const b of vlq(delta)) tpush(b); for(const b of bytes) tpush(b); }
+
+    // Tempo at start, channel 0
+    tevent(0, [0xFF,0x58,0x04, 0x04,0x02,0x24,0x08]); // 4/4
+    tevent(0, [0xFF,0x51,0x03, (usPerQ>>16)&255,(usPerQ>>8)&255,usPerQ&255 ]);
+
+    // Build events
+    let prevTick=0;
+    for(const n of notes){
+      const tick = Math.round(n.t * (tpq* (parseFloat(bpmInput.value)||90) / 60)); // t seconds -> ticks
+      const delta = Math.max(0, tick - prevTick);
+      tevent(delta, [0x90, n.midi&127, n.vel&127]);
+      const off = Math.round(n.dur*tpq);
+      tevent(off, [0x80, n.midi&127, 0x40]);
+      prevTick = tick + off;
+    }
+    // End of track
+    tevent(0, [0xFF,0x2F,0x00]);
+
+    // Wrap track chunk
+    const len = track.length;
+    const lenBytes = [(len>>>24)&255,(len>>>16)&255,(len>>>8)&255,(len)&255];
+    out.push(0x4D,0x54,0x72,0x6B, ...lenBytes, ...track);
+    return out;
+  }
+
+  // Snapshot
+  function snapshot(){
+    const dpr = window.devicePixelRatio||1;
+    const w = cvsSpec.width/dpr;
+    const h = (cvsSpec.height+cvsTime.height+cvsAux.height+24)/dpr;
+    const tmp = document.createElement('canvas'); tmp.width=w*dpr; tmp.height=h*dpr;
+    const cx = tmp.getContext('2d'); cx.setTransform(dpr,0,0,dpr,0,0); cx.fillStyle=CREAM; cx.fillRect(0,0,w,h);
+    let y=0, gap=8;
+    cx.drawImage(cvsSpec,0,y,cvsSpec.width/dpr,cvsSpec.height/dpr); y+=cvsSpec.height/dpr+gap;
+    cx.drawImage(cvsTime,0,y,cvsTime.width/dpr,cvsTime.height/dpr); y+=cvsTime.height/dpr+gap;
+    cx.drawImage(cvsAux,0,y,cvsAux.width/dpr,cvsAux.height/dpr);
+    const url = tmp.toDataURL('image/png'); const a=document.createElement('a'); a.href=url; a.download='sound_analyzer_poster.png'; a.click();
+  }
+
+  // Utils
+  function sum(a){ let s=0; for(const v of a) s+=v; return s; }
+  function mix(hex1, hex2, t){
+    function h2r(h){ return parseInt(h.slice(1,3),16); }
+    function h2g(h){ return parseInt(h.slice(3,5),16); }
+    function h2b(h){ return parseInt(h.slice(5,7),16); }
+    const r=Math.round(h2r(hex1)*(1-t)+h2r(hex2)*t);
+    const g=Math.round(h2g(hex1)*(1-t)+h2g(hex2)*t);
+    const b=Math.round(h2b(hex1)*(1-t)+h2b(hex2)*t);
+    return `rgb(${r},${g},${b})`;
+  }
+  function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+  function fitCanvas(c){
+    const dpr = Math.max(1, window.devicePixelRatio||1);
+    const rect = c.getBoundingClientRect();
+    c.width = Math.floor(rect.width * dpr);
+    c.height= Math.floor(rect.height* dpr);
+    const cx = c.getContext('2d', {alpha:false}); cx.setTransform(dpr,0,0,dpr,0,0);
+    return cx;
+  }
+
+  // Keys
+  window.addEventListener('keydown', (e)=>{
+    if(e.code==='Space'){ e.preventDefault(); paused=!paused; }
+    if(e.key==='1'){ modeSel.value='time'; modeSel.dispatchEvent(new Event('change')); }
+    if(e.key==='2'){ modeSel.value='spectrum'; modeSel.dispatchEvent(new Event('change')); }
+    if(e.key==='3'){ modeSel.value='mel'; modeSel.dispatchEvent(new Event('change')); }
+    if(e.key==='4'){ modeSel.value='chroma'; modeSel.dispatchEvent(new Event('change')); }
+  });
+
+})();</script>
+</body>
+</html>

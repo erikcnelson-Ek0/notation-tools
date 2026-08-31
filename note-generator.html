@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="icon" href="data:,">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Note Generator</title>
+<link rel="stylesheet" href="./assets/theme.css" />
+<style>
+  :root{ --cream: var(--paper); --blue: var(--accent-a); --pink: var(--accent-b); --grey: var(--stone); --ink: var(--ink-strong); }
+  .wrap{max-width:1120px;margin:0 auto;padding:24px 20px;display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+  .controls{grid-column:1/5;display:grid;gap:10px;align-content:start}
+  .canvasWrap{grid-column:5/-1;display:grid;gap:10px;align-content:start}
+  label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:4px;color:var(--ink)}
+  select,input[type="number"],button{width:100%;padding:9px 11px;border:1px solid var(--stone);border-radius:var(--radius-sm);background:var(--paper-lift);color:var(--ink-strong);font-size:13px}
+  button{cursor:pointer;border:1px solid var(--ink-strong);text-transform:uppercase;letter-spacing:.05em;font-size:11px}
+  button.primary{background:var(--ink-strong);color:var(--paper)}
+  button:hover{opacity:.85}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .actions{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  canvas{width:100%;height:320px;background:linear-gradient(180deg,var(--paper-lift),var(--paper));border:1px solid var(--stone);border-radius:var(--radius)}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th,td{padding:6px 8px;border-bottom:1px solid var(--stone)}
+  th{text-align:left;color:var(--ink);font-weight:400;text-transform:uppercase;letter-spacing:.05em;font-size:10px}
+  .footer{grid-column:1/-1;color:var(--ink);font-size:12px;margin-top:8px;opacity:.8}
+  .muted{opacity:.7}
+  .err{background:#fbeceb;border-color:#e2a9a4;color:#7a2a24}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div style="grid-column:1/-1">
+      <h1 class="title" style="font-size:16px">Note Generator</h1>
+      <div class="sub">Choose a pattern, key/scale, tempo, and bars → Generate → export CSV or MIDI</div>
+      <div class="converge-bar"></div>
+    </div>
+
+    <section class="panel controls" id="ctl">
+      <div class="row">
+        <div>
+          <label for="pattern">Pattern</label>
+          <select id="pattern">
+            <option value="arp">Arp Weave</option>
+            <option value="pulse">Minimal Pulse</option>
+            <option value="drone">Liminal Drone</option>
+            <option value="clock">Broken Clock (3:4)</option>
+            <option value="canon">Chroma Canon</option>
+          </select>
+        </div>
+        <div>
+          <label for="bpm">Tempo (BPM)</label>
+          <input id="bpm" type="number" value="120" min="40" max="220" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label for="root">Root</label>
+          <select id="root">
+            <option>C</option><option>C#</option><option>D</option><option>D#</option>
+            <option>E</option><option>F</option><option>F#</option><option>G</option>
+            <option>G#</option><option>A</option><option>A#</option><option>B</option>
+          </select>
+        </div>
+        <div>
+          <label for="scale">Scale</label>
+          <select id="scale">
+            <option value="major">Major (Ionian)</option>
+            <option value="minor" selected>Minor (Aeolian)</option>
+            <option value="dorian">Dorian</option>
+            <option value="mixolydian">Mixolydian</option>
+            <option value="minorpent">Minor Pentatonic</option>
+            <option value="chromatic">Chromatic</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label for="bars">Bars (4/4)</label>
+          <input id="bars" type="number" value="4" min="1" max="32" />
+        </div>
+        <div>
+          <label for="octave">Base Octave</label>
+          <input id="octave" type="number" value="4" min="0" max="8" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label for="vel">Velocity (1–127)</label>
+          <input id="vel" type="number" value="96" min="1" max="127" />
+        </div>
+        <div>
+          <label for="swing">Swing % (visual only)</label>
+          <input id="swing" type="number" value="0" min="0" max="60" />
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="primary" id="generate">Generate</button>
+        <button id="exportCsv">Export CSV</button>
+        <button id="exportMidi">Export MIDI</button>
+      </div>
+      <div style="margin-top:8px">
+        <span class="badge" id="status">Ready.</span>
+      </div>
+      <div id="errbox" class="panel err" style="display:none;margin-top:8px"></div>
+      <div style="margin-top:8px"><a class="textBtn" href="./index.html">Collection</a></div>
+    </section>
+
+    <section class="panel canvasWrap">
+      <div>
+        <label>Piano Roll (beats → / pitch ↑)</label>
+        <canvas id="roll" width="900" height="320" aria-label="Piano roll"></canvas>
+      </div>
+      <div>
+        <label>Notes</label>
+        <table id="notesTable" aria-label="Generated notes table">
+          <thead><tr><th>#</th><th>Time (beats)</th><th>Note</th><th>MIDI</th><th>Dur (beats)</th><th>Vel</th><th>Comment</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="footer">
+      <strong>Schema:</strong> time_beats, midi_note, note_name, duration_beats, velocity, comment.
+      <span class="muted">If downloads are blocked, allow pop-ups/downloads for file:// pages.</span>
+    </div>
+  </div>
+
+<script>
+/* ---- Error handling ---- */
+(function(){
+  const errbox = document.getElementById("errbox");
+  function showErr(msg){
+    errbox.style.display = "block";
+    errbox.textContent = msg;
+    const st = document.getElementById("status");
+    st.textContent = "Error — see box below.";
+  }
+  window.addEventListener("error", (e)=>{
+    showErr(String(e.message || e.error || e));
+  });
+  window.addEventListener("unhandledrejection", (e)=>{
+    showErr("Promise rejection: " + String(e.reason || e));
+  });
+  window.__showErr = showErr;
+})();
+
+/* ---- Theory helpers ---- */
+const NOTE_INDEX = {"C":0,"C#":1,"Db":1,"D":2,"D#":3,"Eb":3,"E":4,"F":5,"F#":6,"Gb":6,"G":7,"G#":8,"Ab":8,"A":9,"A#":10,"Bb":10,"B":11};
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+const SCALES = {
+  major:       [0,2,4,5,7,9,11],
+  minor:       [0,2,3,5,7,8,10],
+  dorian:      [0,2,3,5,7,9,10],
+  mixolydian:  [0,2,4,5,7,9,10],
+  minorpent:   [0,3,5,7,10],
+  chromatic:   [0,1,2,3,4,5,6,7,8,9,10,11]
+};
+
+function midiToName(n){
+  const name = NOTE_NAMES[n % 12];
+  const oct = Math.floor(n/12) - 1;
+  return name+oct;
+}
+
+function scaleDegrees(rootName, scaleKind, octave){
+  const rootIdx = NOTE_INDEX[rootName];
+  if (rootIdx==null){ throw new Error("Unknown root: " + rootName); }
+  const rootMidi = (octave+1)*12 + rootIdx;
+  const intervals = SCALES[scaleKind];
+  if (!intervals){ throw new Error("Unknown scale: " + scaleKind); }
+  const degrees = [];
+  for(let o=-1;o<=3;o++){
+    for(const iv of intervals){
+      degrees.push(rootMidi + iv + 12*o);
+    }
+  }
+  return degrees.sort((a,b)=>a-b);
+}
+
+function degreeAt(degArray, idx){
+  if (!degArray || !degArray.length) return 60;
+  const i = ((idx % degArray.length)+degArray.length) % degArray.length;
+  return degArray[i];
+}
+
+/* ---- Pattern engines ---- */
+function genArp({degrees, bars, vel}){
+  const seq = [];
+  const base = [0,2,4,6,7,4,2,0];
+  let t = 0;
+  const steps = bars*8; // 1/8s
+  for(let i=0;i<steps;i++){
+    const di = base[i % base.length];
+    const midi = degreeAt(degrees, 20 + di);
+    seq.push({t, midi, dur: 0.5, vel, comment:"Arp step"});
+    t += 0.5;
+  }
+  return seq;
+}
+
+function genPulse({degrees, bars, vel}){
+  const total = bars*4;
+  const pick = (idx)=>degreeAt(degrees, idx);
+  const pattern = [
+    {n: pick(0), d:1.0, v:vel, c:"Downbeat"},
+    {n: null, d:0.5, v:0, c:"Rest"},
+    {n: pick(4), d:0.5, v:vel-6, c:"Pickup"},
+    {n: pick(3), d:1.0, v:vel-2, c:"Beat 2"},
+    {n: null, d:0.5, v:0, c:"Rest"},
+    {n: pick(2), d:0.5, v:vel-6, c:"Pickup"},
+    {n: pick(0), d:1.0, v:vel, c:"Beat 3"},
+    {n: null, d:1.0, v:0, c:"Rest 4"}
+  ];
+  const seq=[];
+  let t=0;
+  while(t < total){
+    for(const p of pattern){
+      if (t >= total) break;
+      if (p.n!==null) seq.push({t, midi:p.n, dur:p.d, vel:p.v, comment:p.c});
+      t += p.d;
+    }
+  }
+  return seq;
+}
+
+function genDrone({degrees, bars, vel}){
+  const total = bars*4;
+  const seq=[];
+  const picks = [0,4,7,9,11];
+  let t=0;
+  for(let i=0;i<picks.length;i++){
+    const midi = degreeAt(degrees, 20 + picks[i]);
+    const dur = Math.max(2, total - t);
+    seq.push({t, midi, dur, vel: Math.min(127, vel-10 + i*3), comment:"Drone"});
+    t += 0.5;
+  }
+  const shimmerTime = Math.min(total-1, 8);
+  const shimmerMidi = degreeAt(degrees, 20 + 12);
+  seq.push({t: shimmerTime, midi: shimmerMidi, dur: 2.0, vel: Math.max(40, vel-20), comment:"Shimmer"});
+  return seq;
+}
+
+function genClock({degrees, bars, vel}){
+  const total = bars*4;
+  const seq=[];
+  const motifIdx = [0,2,4];
+  const motifDur = 0.75;
+  const starts = [];
+  for(let tp=0; tp<=total; tp+=3){ starts.push(tp); }
+  for(const s of starts){
+    for(let j=0;j<motifIdx.length;j++){
+      const midi = degreeAt(degrees, 16 + motifIdx[j]);
+      const t = s + j*motifDur;
+      if (t < total) seq.push({t, midi, dur: motifDur, vel, comment:"3:4 motif"});
+    }
+  }
+  return seq;
+}
+
+function genCanon({degrees, bars, vel}){
+  const total = bars*4;
+  const seq=[];
+  const motif = [0,1,2,4,3,1];
+  let tA=0;
+  const dur=1.0;
+  while(tA < total){
+    for(const di of motif){
+      if (tA >= total) break;
+      seq.push({t:tA, midi: degreeAt(degrees, 18 + di), dur, vel: vel-4, comment:"Voice A"});
+      tA += dur;
+    }
+  }
+  let tB = 4.0; // 1-bar offset
+  while(tB < total){
+    for(const di of motif){
+      if (tB >= total) break;
+      seq.push({t:tB, midi: degreeAt(degrees, 18 + di), dur, vel: vel-10, comment:"Voice B"});
+      tB += dur;
+    }
+  }
+  return seq;
+}
+
+/* ---- MIDI writer (Type 0, 480 TPQ) ---- */
+function toVLQ(value){
+  let buffer = value & 0x7F;
+  const bytes = [];
+  while((value >>= 7)){
+    buffer <<= 8;
+    buffer |= ((value & 0x7F) | 0x80);
+  }
+  // emit
+  while(true){
+    bytes.push(buffer & 0xFF);
+    if (buffer & 0x80){ buffer >>= 8; } else break;
+  }
+  return bytes;
+}
+
+function buildMIDI(events, bpm){
+  const TPQ = 480;
+  const usPerQuarter = Math.max(1, Math.round(60000000 / Math.max(1,bpm)));
+  // flatten on/off
+  const sorted = [];
+  for(const e of events){
+    sorted.push({time:e.t, type:'on', midi:e.midi, vel:Math.max(1,Math.min(127,e.vel))});
+    sorted.push({time:e.t + Math.max(0.05,e.dur), type:'off', midi:e.midi, vel:0});
+  }
+  sorted.sort((a,b)=> (a.time===b.time) ? (a.type==='off'?1:-1) : a.time-b.time);
+  let lastTick = 0;
+  const tock = (beats)=> Math.round(beats * TPQ);
+  const header = [0x4d,0x54,0x68,0x64, 0x00,0x00,0x00,0x06, 0x00,0x00, 0x00,0x01, 0x01,0xE0]; // MThd
+  const track = [];
+  // tempo + timesig + key
+  track.push(...toVLQ(0), 0xFF, 0x51, 0x03, (usPerQuarter>>16)&255, (usPerQuarter>>8)&255, usPerQuarter&255);
+  track.push(...toVLQ(0), 0xFF, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08);
+  track.push(...toVLQ(0), 0xFF, 0x59, 0x02, 0x00, 0x00);
+  // notes
+  for(const ev of sorted){
+    const currentTick = tock(ev.time);
+    const delta = currentTick - lastTick;
+    lastTick = currentTick;
+    track.push(...toVLQ(Math.max(0,delta)));
+    if (ev.type==='on'){
+      track.push(0x90, ev.midi & 0x7F, ev.vel & 0x7F);
+    } else {
+      track.push(0x80, ev.midi & 0x7F, 0x00);
+    }
+  }
+  // end
+  track.push(...toVLQ(0), 0xFF, 0x2F, 0x00);
+  // track chunk
+  const trackLen = track.length;
+  const trackHeader = [0x4d,0x54,0x72,0x6b, (trackLen>>24)&255, (trackLen>>16)&255, (trackLen>>8)&255, trackLen&255];
+  return new Uint8Array([...header, ...trackHeader, ...track]);
+}
+
+/* ---- CSV ---- */
+function toCSV(events){
+  const rows = [["step","time_beats","midi_note","note_name","duration_beats","velocity","comment"]];
+  const sorted = [...events].sort((a,b)=> a.t===b.t ? a.midi-b.midi : a.t-b.t);
+  let i=1;
+  for(const e of sorted){
+    rows.push([i++, e.t.toFixed(3), e.midi, midiToName(e.midi), e.dur.toFixed(3), e.vel, e.comment || ""]);
+  }
+  return rows.map(r=>r.join(",")).join("\n");
+}
+
+/* ---- Piano Roll ---- */
+function drawRoll(canvas, events, bars){
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+  const totalBeats = Math.max(1, bars*4);
+  for(let b=0;b<=totalBeats;b++){
+    const x = (b/totalBeats)*W;
+    ctx.strokeStyle = b%4===0 ? '#AEC0BC' : '#C7C6C1';
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+  }
+  const pitches = events.length ? {min: Math.min(...events.map(e=>e.midi)), max: Math.max(...events.map(e=>e.midi))} : {min:60,max:72};
+  const pRange = Math.max(1,(pitches.max - pitches.min + 1));
+  for(const e of events){
+    const x = (e.t/(totalBeats))*W;
+    const w = (e.dur/(totalBeats))*W;
+    const y = H - ((e.midi - pitches.min + 1)/pRange)*H;
+    const h = Math.max(6, H/pRange - 2);
+    ctx.fillStyle = "#2E2E2A"; ctx.globalAlpha = 0.85;
+    ctx.fillRect(x+0.5, y+0.5, Math.max(2,w-1), h);
+    ctx.globalAlpha = 1;
+  }
+}
+
+/* ---- UI glue ---- */
+const el = id=>document.getElementById(id);
+const state = { events: [], lastName: "Pattern" };
+
+function updateTable(events){
+  const tbody = el("notesTable").querySelector("tbody");
+  tbody.innerHTML="";
+  const sorted = [...events].sort((a,b)=> a.t===b.t ? a.midi-b.midi : a.t-b.t);
+  let i=1;
+  for(const e of sorted){
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${i++}</td><td>${e.t.toFixed(3)}</td><td>${midiToName(e.midi)}</td><td>${e.midi}</td><td>${e.dur.toFixed(3)}</td><td>${e.vel}</td><td>${e.comment||""}</td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+function stampName(){
+  const r = el("root").value; const s = el("scale").value; const bpm = el("bpm").value; const p = el("pattern").value;
+  const patternName = {arp:"Arp_Weave", pulse:"Minimal_Pulse", drone:"Liminal_Drone", clock:"Broken_Clock", canon:"Chroma_Canon"}[p] || "Pattern";
+  const scaleShort = s==='minor'?'min': s==='major'?'maj': s;
+  return `${patternName}_${r}${scaleShort}_${bpm}BPM`;
+}
+
+function generate(){
+  try {
+    const st = el("status");
+    st.textContent = "Generating…";
+    const pattern = el("pattern").value;
+    const root = el("root").value;
+    const scale = el("scale").value;
+    const bars = parseInt(el("bars").value,10);
+    const bpm = parseInt(el("bpm").value,10);
+    const baseOct = parseInt(el("octave").value,10);
+    const vel = parseInt(el("vel").value,10);
+    const degrees = scaleDegrees(root, scale, baseOct);
+    let seq=[];
+    if (pattern==='arp') seq = genArp({degrees, bars, vel});
+    if (pattern==='pulse') seq = genPulse({degrees, bars, vel});
+    if (pattern==='drone') seq = genDrone({degrees, bars, vel});
+    if (pattern==='clock') seq = genClock({degrees, bars, vel});
+    if (pattern==='canon') seq = genCanon({degrees, bars, vel});
+    state.events = seq;
+    state.lastName = stampName();
+    drawRoll(el("roll"), seq, bars);
+    updateTable(seq);
+    st.textContent = `Generated ${seq.length} notes — ${state.lastName}`;
+  } catch (e){
+    window.__showErr("Generate failed: " + e.message);
+  }
+}
+
+el("generate").addEventListener("click", generate);
+
+el("exportCsv").addEventListener("click", ()=>{
+  try{
+    if (!state.events.length){ alert("No notes yet. Click Generate first."); return; }
+    const csv = toCSV(state.events);
+    const blob = new Blob([csv], {type:"text/csv"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = state.lastName + ".csv";
+    a.rel = "noopener";
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+  } catch(e){
+    window.__showErr("CSV export failed: " + e.message);
+  }
+});
+
+el("exportMidi").addEventListener("click", ()=>{
+  try{
+    if (!state.events.length){ alert("No notes yet. Click Generate first."); return; }
+    const bpm = parseInt(el("bpm").value,10);
+    const data = buildMIDI(state.events, bpm);
+    const blob = new Blob([data], {type:"audio/midi"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = state.lastName + ".mid";
+    a.rel = "noopener";
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+  } catch(e){
+    window.__showErr("MIDI export failed: " + e.message);
+  }
+});
+
+// auto-generate on load, after a tick to ensure DOM settled
+window.requestAnimationFrame(()=>generate());
+</script>
+</body>
+</html>
